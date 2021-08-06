@@ -1,12 +1,12 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
 mod error;
-mod request;
+mod http;
 mod connector;
 mod input;
 
 use error::Error;
-use request::HttpRequest;
+use http::Request;
 
 pub fn perform(args: &Vec<String>) {
     let input = match input::parse_args(&args) {
@@ -24,12 +24,22 @@ pub fn perform(args: &Vec<String>) {
             return
         }
     };
-    println!("{:?}", servers);
 
-    let request = HttpRequest::new(input.method, &input.url);
+    let mut request = Request::new(input.method, &input.url);
+    if let Some(headers) = input.headers {
+        request.headers.append(headers);
+    }
+    if let Some(body) = input.body {
+        request.set_body(body);
+        if input.json {
+            request.headers.add("Content-Type", "application/json")
+        }
+    }
+
     let request_str = request.build();
     println!("{}", request_str);
 
+    //return;
     let mut response_buffer = vec![];
     match input.url.scheme() {
        "http" => connector::do_http_request(
@@ -43,6 +53,8 @@ pub fn perform(args: &Vec<String>) {
            &mut response_buffer).unwrap(),
        _ => {},
     };
+
+    let response = http::Response::from_response(&response_buffer).unwrap();
 
     println!("{}", String::from_utf8_lossy(&response_buffer));
 }

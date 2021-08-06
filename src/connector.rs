@@ -6,7 +6,7 @@ use native_tls::TlsConnector;
 use super::error::Error;
 
 pub fn do_http_request(addr: SocketAddr, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> {
-    let mut stream = new_connection(addr)?;
+    let mut stream = TcpStream::connect(addr)?;
     write_read(&mut stream, message, buffer)
 }
 
@@ -14,10 +14,6 @@ pub fn do_https_request(addr: SocketAddr, domain: &str, message: &[u8], buffer: 
 -> Result<(), Error> {
     let mut stream = new_tls_connection(addr, domain)?;
     write_read(&mut stream, message, buffer)
-}
-
-fn new_connection(addr: std::net::SocketAddr) -> Result<TcpStream, Error>  {
-    Ok(TcpStream::connect(addr)?)
 }
 
 fn new_tls_connection(addr: SocketAddr, domain: &str) -> Result<native_tls::TlsStream<TcpStream>, Error>  {
