@@ -6,7 +6,8 @@ mod connector;
 mod input;
 
 use error::Error;
-use http::Request;
+use http::request::Request;
+use http::Printer;
 
 pub fn perform(args: &Vec<String>) {
     let input = match input::parse_args(&args) {
@@ -35,11 +36,15 @@ pub fn perform(args: &Vec<String>) {
             request.headers.add("Content-Type", "application/json")
         }
     }
-
     let request_str = request.build();
-    println!("{}", request_str);
+    if input.verbose {
+        request.print_headers(input.verbose);
+        request.print_body(input.verbose);
+    } else if input.raw {
+        println!("--- HTTP Request ---");
+        println!("{}", request_str);
+    }
 
-    //return;
     let mut response_buffer = vec![];
     match input.url.scheme() {
        "http" => connector::do_http_request(
@@ -54,9 +59,20 @@ pub fn perform(args: &Vec<String>) {
        _ => {},
     };
 
-    let response = http::Response::from_response(&response_buffer).unwrap();
-
-    println!("{}", String::from_utf8_lossy(&response_buffer));
+    let response = http::response::Response::from_response(&response_buffer).unwrap();
+    if input.raw {
+        match response.raw {
+            Some(body) => {
+                println!("--- Response HTTP ---");
+                println!("{}", body);
+                println!("---");
+            }
+            None => {},
+        }
+    } else {
+        response.print_headers(input.verbose);
+        response.print_body(input.verbose);
+    }
 }
 
 fn addr_from_url(url: &url::Url) -> Result<Vec<SocketAddr>, Error> {

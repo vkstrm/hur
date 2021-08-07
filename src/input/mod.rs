@@ -7,9 +7,11 @@ use clap::{ArgMatches, App, Arg};
 pub struct Input {
     pub url: url::Url,
     pub method: http::Method,
-    pub headers: Option<http::Headers>,
+    pub headers: Option<http::headers::Headers>,
     pub body: Option<String>,
     pub json: bool,
+    pub verbose: bool,
+    pub raw: bool,
 }
 
 pub fn parse_args(args: &Vec<String>) -> Result<Input, Error> {
@@ -28,7 +30,7 @@ pub fn parse_args(args: &Vec<String>) -> Result<Input, Error> {
     // Collect headers
     let headers = match matches.values_of("header") {
         Some(values) => {
-            let mut headers = http::Headers::new();
+            let mut headers = http::headers::Headers::new();
             for val in values {
                 let splits: Vec<&str> = val.splitn(2, ':').collect();
                 headers.add(splits[0], splits[1]);
@@ -56,6 +58,8 @@ pub fn parse_args(args: &Vec<String>) -> Result<Input, Error> {
             headers,
             body,
             json,
+            verbose: matches.is_present("verbose"),
+            raw: matches.is_present("raw")
         }
     )
 }
@@ -73,6 +77,17 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
     return
     App::new("rttp")
         .version("v0.1.0")
+        .arg(
+            Arg::new("verbose")
+                .long("verbose")
+                .short('v')
+                .about("Print request and response in full")
+        )
+        .arg(
+            Arg::new("raw")
+                .long("raw")
+                .about("Print full response and request HTTP")
+        )
         .arg(
             Arg::new("url")
                 .required(true)
