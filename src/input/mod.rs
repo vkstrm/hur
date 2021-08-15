@@ -1,11 +1,9 @@
-use super::error::Error;
 use super::http;
 
-use url::Url;
 use clap::{ArgMatches, App, Arg};
 
 pub struct Input {
-    pub url: url::Url,
+    pub url: String,
     pub method: http::Method,
     pub headers: Option<http::headers::Headers>,
     pub body: Option<String>,
@@ -14,18 +12,8 @@ pub struct Input {
     pub raw: bool,
 }
 
-pub fn parse_args(args: &Vec<String>) -> Result<Input, Error> {
+pub fn parse_args(args: &Vec<String>) -> Input {
     let matches = use_clap(&args);
-
-    // Validate URL
-    let parsed_url = match Url::parse(matches.value_of("url").unwrap()) {
-        Ok(url) => url,
-        Err(why) => return Err(Error::new(&why.to_string()))
-    };
-
-    if !parsed_url.has_host() {
-        return Err(Error::new("no host in input"))
-    }
 
     // Collect headers
     let headers = match matches.values_of("header") {
@@ -51,25 +39,23 @@ pub fn parse_args(args: &Vec<String>) -> Result<Input, Error> {
         json = true;
     }
 
-    Ok(
-        Input{
-            url: parsed_url,
-            method: get_method(matches.value_of("method").unwrap())?,
-            headers,
-            body,
-            json,
-            verbose: matches.is_present("verbose"),
-            raw: matches.is_present("raw")
-        }
-    )
+    Input{
+        url: matches.value_of("url").unwrap().to_string(),
+        method: get_method(matches.value_of("method").unwrap()),
+        headers,
+        body,
+        json,
+        verbose: matches.is_present("verbose"),
+        raw: matches.is_present("raw")
+    }
 }
 
-fn get_method(method: &str) -> Result<http::Method, Error> {
+fn get_method(method: &str) -> http::Method {
     match method.to_lowercase().as_str() {
-        "get" => Ok(http::Method::GET),
-        "post" => Ok(http::Method::POST),
-        "put" => Ok(http::Method::PUT),
-        _ => Err(Error::new("unsupported method")),
+        "get" => http::Method::GET,
+        "post" => http::Method::POST,
+        "put" => http::Method::PUT,
+        _ => http::Method::GET,
     }
 }
 
@@ -102,6 +88,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
         )
         .arg(
             Arg::new("header")
+                .about("Header for request")
                 .takes_value(true)
                 .short('h')
                 .long("header")
@@ -109,6 +96,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
         )
         .arg(
             Arg::new("body")
+                .about("Body for request")
                 .long("body")
                 .takes_value(true)
         )

@@ -1,24 +1,37 @@
 use super::Method;
 use super::headers::Headers;
+use url::Url;
+
+use crate::error::Error;
 
 pub struct Request {
     pub method: Method,
     path: String,
     pub headers: Headers,
     body: Option<String>,
+    pub url: url::Url,
 }
 
 impl Request {
-    pub fn new(method: Method, url: &url::Url) -> Request {
+    pub fn new(method: Method, url: &str) -> Result<Request, Error> {
+        let parsed_url = match Url::parse(url) {
+            Ok(url) => url,
+            Err(why) => return Err(Error::new(&why.to_string()))
+        };
+        if !parsed_url.has_host() {
+            return Err(Error::new("no host in input"))
+        }
+
         let mut headers = Headers::new();
-        headers.add("Host", &url.host().unwrap().to_string());
+        headers.add("Host", &parsed_url.host().unwrap().to_string());
         headers.add("Connection", "close");
-        Request{
+        Ok(Request{
             method,
-            path: String::from(url.path()),
+            path: String::from(parsed_url.path()),
             headers,
             body: None,
-        }
+            url: parsed_url,
+        })
     }
 
     pub fn build(&self) -> String {

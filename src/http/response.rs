@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use super::headers::Headers;
 use crate::error::Error;
 
