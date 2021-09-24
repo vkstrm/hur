@@ -1,4 +1,4 @@
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr};
 
 mod error;
 mod http;
@@ -6,12 +6,16 @@ mod connector;
 mod input;
 
 use error::Error;
-use http::request::Request;
-use http::Printer;
+use http::request::{self, Request};
 
-pub fn perform(args: &Vec<String>) {
+pub fn handle_arguments(args: &Vec<String>) {
     let input = input::parse_args(&args);
-    let mut request = match Request::new(input.method, &input.url) {
+    perform(input);
+}
+
+fn perform(input: input::Input) {
+    let verbose = input.verbose;
+    let request = match setup_request(input) {
         Ok(request) => request,
         Err(why) => {
             eprintln!("{}", why);
@@ -19,82 +23,79 @@ pub fn perform(args: &Vec<String>) {
         }
     };
 
+    if verbose {
+        let json = serde_json::to_string_pretty(&request).unwrap();
+        println!("{}", json);
+    }
+
+    let response = send_request(request).unwrap();
+    if verbose {
+        let json = serde_json::to_string_pretty(&response).unwrap();
+        println!("{}", json);
+    } else if response.status_code < 400 {
+        println!("{}", response.body.unwrap());
+    } else {
+        println!("{}", response.status_code);
+    }
+}
+
+fn setup_request(input: input::Input) -> Result<request::Request, Error> {
+    let mut request = Request::new(input.method, input.url.as_str())?;
     if let Some(headers) = input.headers {
         request.headers.append(headers);
     }
-    if let Some(body) = input.body {
+    if let Some(body) = &input.body {
         request.set_body(body);
         if input.json {
             request.headers.add("Content-Type", "application/json")
         }
     }
-    let request_str = request.build();
-    if input.verbose {
-        request.print_headers(input.verbose);
-        request.print_body(input.verbose);
-    } else if input.raw {
-        println!("--- HTTP Request ---");
-        println!("{}", request_str);
-    }
 
-    let servers = match addr_from_url(&request.url) {
-        Ok(servers) => servers,
-        Err(why) => {
-            eprintln!("{}", why);
-            return
-        }
-    };
-
-    let mut response_buffer = vec![];
-    match request.url.scheme() {
-       "http" => connector::do_http_request(
-           servers[0],
-           request_str.as_bytes(),
-           &mut response_buffer).unwrap(),
-       "https" => connector::do_https_request(
-           servers[0], 
-           request.url.domain().unwrap(),
-           &request_str.as_bytes(), 
-           &mut response_buffer).unwrap(),
-       _ => {},
-    };
-
-    match http::response::Response::from_response(&response_buffer) {
-        Ok(response) => {
-            if input.raw {
-                match response.raw {
-                    Some(body) => {
-                        println!("--- Response HTTP ---");
-                        println!("{}", body);
-                        println!("---");
-                    }
-                    None => {},
-                }
-            } else {
-                response.print_headers(input.verbose);
-                response.print_body(input.verbose);
-            }
-        },
-        Err(why) => eprintln!("{}", why),
-    }
+    Ok(request)
 }
 
-fn addr_from_url(url: &url::Url) -> Result<Vec<SocketAddr>, Error> {
-    let mut server_details = String::new();
-    match url.domain() {
-        Some(_) => server_details.push_str(url.domain().unwrap()),
-        None => server_details.push_str(url.host_str().unwrap()), 
-    };
-    server_details.push(':');
-    match url.port() {
-        Some(port) => server_details.push_str(&port.to_string()),
-        None => {
-            match url.scheme() {
-                "https" => server_details.push_str("443"),
-                "http" => server_details.push_str("80"),
-                _ => return Err(Error::new("only support http/s"))
-            }
+fn send_request(request: http::request::Request) -> Result<http::response::Response, Error> {
+    let scheme = request.scheme.clone();
+    for server in &request.servers {
+        let request_result = match scheme.as_str() {
+            "http" => send_http_request(*server, &request.build()),
+            "https" => send_https_request(*server, &request.build(), &request.domain),
+            _ => Err(Error::new("only http/s supported")),
+        };
+        if request_result.is_ok() {
+            return Ok(request_result.unwrap())
         }
     }
-    Ok(server_details.to_socket_addrs()?.collect())
+
+    Err(Error::new("no server worked"))
+}
+
+fn send_http_request(server: SocketAddr, request_str: &str) -> Result<http::response::Response, Error> {
+    let mut response_buffer = vec![];
+    match connector::do_http_request(
+            server,
+            request_str.as_bytes(),
+            &mut response_buffer) {
+                Ok(()) => http::response::Response::from_response(&response_buffer),
+                Err(why) => Err(why)
+            }
+}
+
+fn send_https_request(server: SocketAddr, request_str: &str, domain: &Option<String>) -> Result<http::response::Response, Error> {
+    let mut response_buffer = vec![];
+    let domain = match domain {
+        Some(domain) => domain,
+        None => return Err(Error::new("Need domain for HTTPS"))
+    };
+    match connector::do_https_request(
+        server, 
+        domain,
+        request_str.as_bytes(), 
+        &mut response_buffer) {
+            Ok(()) => match http::response::Response::from_response(&response_buffer) {
+                    Ok(response) => Ok(response),
+                    Err(why) => Err(why),
+                },
+            Err(why) => Err(why)
+        }
 }

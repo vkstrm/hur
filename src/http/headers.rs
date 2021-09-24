@@ -1,8 +1,22 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
+
+use serde::ser::SerializeMap;
 
 #[derive(Debug)]
 pub struct Headers {
     pub headers_map: std::collections::HashMap<String, Vec<String>>
+}
+
+impl serde::Serialize for Headers {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+            S: serde::Serializer {
+        let mut map = serializer.serialize_map(Some(self.headers_map.len()))?;
+        for (k, v) in &self.headers_map {
+            map.serialize_entry(&k, &v)?;
+        }
+        map.end()
+    }
 }
 
 impl Headers {
@@ -27,7 +41,7 @@ impl Headers {
         for (key, val) in other.headers_map {
             let key = capitalize(&key);
             match key.as_str() {
-                "Connection" | "connection" | "Host" | "host" => {
+                "Connection" | "Host" => {
                     self.headers_map.insert(key, val);
                 },
                 _ => {
@@ -37,6 +51,12 @@ impl Headers {
                 }
             }
         }
+    }
+}
+
+impl Display for Headers {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self.headers_map)
     }
 }
 

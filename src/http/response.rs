@@ -1,7 +1,7 @@
 use super::headers::Headers;
 use crate::error::Error;
 
-#[derive(Debug)]
+#[derive(serde::Serialize, Debug)]
 pub struct Response {
     pub protocol: String,
     pub status_code: i32,
@@ -54,29 +54,5 @@ impl Response {
             body,
             raw,
         })
-    }
-}
-
-impl super::Printer for Response {
-    fn print_headers(&self, verbose: bool) {
-        if verbose {
-            println!("--- Response Headers ---");
-            for (key, values) in &self.headers.headers_map {
-                let joined = values.join(",");
-                println!("{}: {}", key, joined);
-            }
-        }
-    }
-
-    fn print_body(&self, verbose: bool) {
-        match &self.body {
-            Some(body) => {
-                if verbose {
-                    println!("--- Response Body ---");
-                }
-                println!("{}", body);
-            }
-            None => {},
-        }
     }
 }
