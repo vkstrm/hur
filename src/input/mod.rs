@@ -9,7 +9,6 @@ pub struct Input {
     pub body: Option<String>,
     pub json: bool,
     pub verbose: bool,
-    pub raw: bool,
 }
 
 pub fn parse_args(args: &Vec<String>) -> Input {
@@ -46,7 +45,6 @@ pub fn parse_args(args: &Vec<String>) -> Input {
         body,
         json,
         verbose: matches.is_present("verbose"),
-        raw: matches.is_present("raw")
     }
 }
 
@@ -61,18 +59,13 @@ fn get_method(method: &str) -> http::Method {
 
 fn use_clap(args: &Vec<String>) -> ArgMatches {
     return
-    App::new("rttp")
+    App::new("hur")
         .version("v0.1.0")
         .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
                 .about("Print request and response in full")
-        )
-        .arg(
-            Arg::new("raw")
-                .long("raw")
-                .about("Print full response and request HTTP")
         )
         .arg(
             Arg::new("url")
@@ -84,7 +77,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
                 .takes_value(true)
                 .short('m')
                 .default_value("get")
-                .possible_values(&["get","post"])
+                .possible_values(&["get","post","put"])
         )
         .arg(
             Arg::new("header")
