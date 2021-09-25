@@ -1,4 +1,5 @@
 use super::http;
+use super::error::Error;
 
 use clap::{ArgMatches, App, Arg};
 
@@ -8,10 +9,18 @@ pub struct Input {
     pub headers: Option<http::headers::Headers>,
     pub body: Option<String>,
     pub json: bool,
+}
+
+pub struct Output {
     pub verbose: bool,
 }
 
-pub fn parse_args(args: &Vec<String>) -> Input {
+pub struct InOut {
+    pub input: Input,
+    pub output: Output,
+}
+
+pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
     let matches = use_clap(&args);
 
     // Collect headers
@@ -34,18 +43,31 @@ pub fn parse_args(args: &Vec<String>) -> Input {
         body = Some(body_str.to_string());
     }
     if let Some(body_str) = matches.value_of("json") {
-        body = Some(body_str.to_string());
+        match serde_json::from_str::<serde_json::Value>(body_str) {
+            Ok(_) => {
+                body = Some(body_str.to_string());
+            },
+            Err(why) => return Err(Error::from(why)),
+        };
         json = true;
     }
 
-    Input{
+    let input = Input{
         url: matches.value_of("url").unwrap().to_string(),
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
         json,
+    };
+
+    let output = Output {
         verbose: matches.is_present("verbose"),
-    }
+    };
+
+    Ok(InOut{
+        input,
+        output
+    })
 }
 
 fn get_method(method: &str) -> http::Method {
@@ -91,6 +113,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
             Arg::new("body")
                 .about("Body for request")
                 .long("body")
+                .conflicts_with("json")
                 .takes_value(true)
         )
         .arg(

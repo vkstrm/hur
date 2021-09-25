@@ -1,25 +1,30 @@
-use std::net::{SocketAddr};
+use std::net::SocketAddr;
 
 mod error;
 mod http;
 mod connector;
-mod input;
+mod inout;
 
 use error::Error;
 use http::request::{self, Request};
 
 #[derive(serde::Serialize)]
-struct Output<'a> {
+struct OutputJson<'a> {
     request: &'a http::request::Request,
     response: &'a http::response::Response
 }
 
 pub fn handle_arguments(args: &Vec<String>) {
-    let input = input::parse_args(&args);
-    handle_input(input);
+    match inout::parse_args(&args) {
+        Ok(res) => handle_input(res),
+        Err(why) => {
+            eprintln!("{}", why.to_string());
+            return;
+        }
+    };
 }
 
-fn handle_input(input: input::Input) {
+fn handle_input(input: inout::InOut) {
     match perform(input) {
         Ok(_) => {},
         Err(why) => {
@@ -28,15 +33,14 @@ fn handle_input(input: input::Input) {
     }
 }
 
-fn perform(input: input::Input) -> Result<(),Error> {
-    let verbose = input.verbose;
-    let request = setup_request(input)?;
+fn perform(inout: inout::InOut) -> Result<(),Error> {
+    let request = setup_request(inout.input)?;
     let response = send_request(&request)?;
-    let output = Output {
+    let output = OutputJson {
         request: &request,
         response: &response
     };
-    if verbose {
+    if inout.output.verbose {
         let json = serde_json::to_string_pretty(&output).unwrap();
         println!("{}", json);
     } else if response.status_code < 400 {
@@ -51,7 +55,7 @@ fn perform(input: input::Input) -> Result<(),Error> {
     Ok(())
 }
 
-fn setup_request(input: input::Input) -> Result<request::Request, Error> {
+fn setup_request(input: inout::Input) -> Result<request::Request, Error> {
     let mut request = Request::new(input.method, input.url.as_str())?;
     if let Some(headers) = input.headers {
         request.headers.append(headers);

@@ -42,3 +42,11 @@ impl From<native_tls::HandshakeError<std::net::TcpStream>> for Error {
         }
     }
 }
+
+impl From<serde_json::error::Error> for Error {
+    fn from(err: serde_json::error::Error) -> Self {
+        Error {
+            message: String::from("JSON input is invalid: ") + &err.to_string(),
+        }
+    }
+}
