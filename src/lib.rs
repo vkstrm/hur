@@ -8,35 +8,47 @@ mod input;
 use error::Error;
 use http::request::{self, Request};
 
-pub fn handle_arguments(args: &Vec<String>) {
-    let input = input::parse_args(&args);
-    perform(input);
+#[derive(serde::Serialize)]
+struct Output<'a> {
+    request: &'a http::request::Request,
+    response: &'a http::response::Response
 }
 
-fn perform(input: input::Input) {
-    let verbose = input.verbose;
-    let request = match setup_request(input) {
-        Ok(request) => request,
+pub fn handle_arguments(args: &Vec<String>) {
+    let input = input::parse_args(&args);
+    handle_input(input);
+}
+
+fn handle_input(input: input::Input) {
+    match perform(input) {
+        Ok(_) => {},
         Err(why) => {
             eprintln!("{}", why);
-            return
-        }
-    };
-
-    if verbose {
-        let json = serde_json::to_string_pretty(&request).unwrap();
-        println!("{}", json);
+        } 
     }
+}
 
-    let response = send_request(request).unwrap();
+fn perform(input: input::Input) -> Result<(),Error> {
+    let verbose = input.verbose;
+    let request = setup_request(input)?;
+    let response = send_request(&request)?;
+    let output = Output {
+        request: &request,
+        response: &response
+    };
     if verbose {
-        let json = serde_json::to_string_pretty(&response).unwrap();
+        let json = serde_json::to_string_pretty(&output).unwrap();
         println!("{}", json);
     } else if response.status_code < 400 {
-        println!("{}", response.body.unwrap());
+        match response.body {
+            Some(body) => println!("{}", body),
+            None => {},
+        }
     } else {
         println!("{}", response.status_code);
     }
+
+    Ok(())
 }
 
 fn setup_request(input: input::Input) -> Result<request::Request, Error> {
@@ -54,7 +66,7 @@ fn setup_request(input: input::Input) -> Result<request::Request, Error> {
     Ok(request)
 }
 
-fn send_request(request: http::request::Request) -> Result<http::response::Response, Error> {
+fn send_request(request: &http::request::Request) -> Result<http::response::Response, Error> {
     let scheme = request.scheme.clone();
     for server in &request.servers {
         let request_result = match scheme.as_str() {
