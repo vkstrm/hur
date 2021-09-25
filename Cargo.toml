@@ -1,6 +1,7 @@
 [package]
-name = "http"
+name = "hur"
 version = "0.1.0"
+description = "HTTP request CLI client"
 authors = ["vkstrm <mongomoves@gmail.com>"]
 edition = "2018"
 
