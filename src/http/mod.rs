@@ -7,12 +7,12 @@ pub enum Method {
     GET,
     POST,
     PUT,
-    DELETE,
-    HEAD,
-    OPTIONS,
-    TRACE,
-    PATCH,
-    CONNECT,
+    // DELETE,
+    // HEAD,
+    // OPTIONS,
+    // TRACE,
+    // PATCH,
+    // CONNECT,
 }
 
 impl std::fmt::Display for Method {

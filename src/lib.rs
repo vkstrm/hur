@@ -14,23 +14,16 @@ struct OutputJson<'a> {
     response: &'a http::response::Response
 }
 
-pub fn handle_arguments(args: &Vec<String>) {
-    match inout::parse_args(&args) {
-        Ok(res) => handle_input(res),
-        Err(why) => {
-            eprintln!("{}", why.to_string());
-            return;
-        }
-    };
+pub fn process(args: &Vec<String>) {
+    match handle_arguments(&args) {
+        Ok(()) => {},
+        Err(why) => eprintln!("{}", why.to_string())
+    }
 }
 
-fn handle_input(input: inout::InOut) {
-    match perform(input) {
-        Ok(_) => {},
-        Err(why) => {
-            eprintln!("{}", why);
-        } 
-    }
+fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
+    let inout = inout::parse_args(args)?;
+    perform(inout)
 }
 
 fn perform(inout: inout::InOut) -> Result<(),Error> {
@@ -40,16 +33,15 @@ fn perform(inout: inout::InOut) -> Result<(),Error> {
         request: &request,
         response: &response
     };
+
     if inout.output.verbose {
         let json = serde_json::to_string_pretty(&output).unwrap();
         println!("{}", json);
-    } else if response.status_code < 400 {
+    } else {
         match response.body {
             Some(body) => println!("{}", body),
             None => {},
         }
-    } else {
-        println!("{}", response.status_code);
     }
 
     Ok(())
