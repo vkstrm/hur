@@ -9,6 +9,7 @@ use crate::error::Error;
 
 #[derive(Serialize)]
 pub struct Request {
+    pub protocol: String,
     pub method: Method,
     path: String,
     pub headers: Headers,
@@ -27,6 +28,7 @@ impl Request {
         headers.add("Host", &url_details.host);
         headers.add("Connection", "close");
         Ok(Request{
+            protocol: String::from("HTTP/1.1"),
             method,
             path: url_details.path,
             headers,
@@ -39,9 +41,10 @@ impl Request {
 
     pub fn build(&self) -> String {
         let mut message = format!(
-            "{method} {path} HTTP/1.1\r\n",
+            "{method} {path} {protocol}\r\n",
             method = self.method.to_string(),
             path = self.path,
+            protocol = self.protocol,
         );
 
         // Add headers
