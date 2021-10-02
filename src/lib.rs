@@ -37,6 +37,8 @@ fn perform(inout: inout::InOut) -> Result<(),Error> {
     if inout.output.verbose {
         let json = serde_json::to_string_pretty(&output).unwrap();
         println!("{}", json);
+    } else if let Some(h) = inout.output.query_header {
+        query_header(&h, response.headers)
     } else {
         match response.body {
             Some(body) => println!("{}", body),
@@ -45,6 +47,17 @@ fn perform(inout: inout::InOut) -> Result<(),Error> {
     }
 
     Ok(())
+}
+
+fn query_header(header: &str, headers: http::headers::Headers) {
+    let h = header.to_lowercase();
+    for (key, value) in headers.headers_map {
+        if h == key.to_lowercase() {
+            for val in value {
+                println!("{}", val);
+            }
+        }
+    }
 }
 
 fn setup_request(input: inout::Input) -> Result<request::Request, Error> {

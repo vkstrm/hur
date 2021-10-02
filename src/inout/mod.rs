@@ -8,11 +8,12 @@ pub struct Input {
     pub method: http::Method,
     pub headers: Option<http::headers::Headers>,
     pub body: Option<String>,
-    pub json: bool,
+    pub json: bool
 }
 
 pub struct Output {
     pub verbose: bool,
+    pub query_header: Option<String>
 }
 
 pub struct InOut {
@@ -57,11 +58,15 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
-        json,
+        json
     };
 
     let output = Output {
         verbose: matches.is_present("verbose"),
+        query_header: match matches.value_of("query-header") {
+            Some(q) => Some(String::from(q.trim())),
+            None => None,
+        }
     };
 
     Ok(InOut{
@@ -121,6 +126,12 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
                 .about("Send body with application/json Content-Type")
                 .long("json")
                 .conflicts_with("body")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::new("query-header")
+                .about("Query for a specific header from the response")
+                .long("query-header")
                 .takes_value(true)
         )
         .get_matches_from(args);
