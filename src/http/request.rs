@@ -20,23 +20,38 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(method: Method, url: &str) -> Result<Request, Error> {
+    pub fn new(method: Method, url: &str, headers: Option<Headers>) -> Result<Request, Error> {
         let parsed_url = parse_url(url)?;
         let url_details = UrlDetails::from_url(&parsed_url);
         let servers = url_details.find_socket_addresses()?;
-        let mut headers = Headers::new();
-        headers.add("Host", &url_details.host);
-        headers.add("Connection", "close");
+        let mut hs = Headers::new();
+        hs.add("Host", &url_details.host);
+        hs.add("Connection", "close");
+        if let Some(headers) = headers {
+            hs.append(headers);
+        }
         Ok(Request{
             protocol: String::from("HTTP/1.1"),
             method,
             path: url_details.path,
-            headers,
+            headers: hs,
             body: None,
             domain: url_details.domain,
             scheme: url_details.scheme,
             servers,
         })
+    }
+
+    pub fn with_body(method: Method, url: &str, headers: Option<Headers>, body: &str) -> Result<Request, Error> {
+        let mut request = Request::new(method, url, headers)?;
+        request.body = Some(body.to_string());
+        Ok(request)
+    }
+
+    pub fn with_json(method: Method, url: &str, headers: Option<Headers>, body: &str) -> Result<Request, Error> {
+        let mut request = Request::with_body(method, url, headers, body)?;
+        request.headers.add("Content-Type", "application/json");
+        Ok(request)
     }
 
     pub fn build(&self) -> String {
@@ -69,10 +84,6 @@ impl Request {
         // Done
         message.push_str("\r\n\r\n");        
         message
-    }
-
-    pub fn set_body(&mut self, body: &str) {
-        self.body = Some(body.to_string());
     }
 }
 

@@ -24,20 +24,6 @@ pub struct InOut {
 pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
     let matches = use_clap(&args);
 
-    // Collect headers
-    let headers = match matches.values_of("header") {
-        Some(values) => {
-            let mut headers = http::headers::Headers::new();
-            for val in values {
-                let splits: Vec<&str> = val.splitn(2, ':').collect();
-                headers.add(splits[0], splits[1]);
-            }
-            Some(headers)
-        },
-        None => None
-    };
-
-    // Collect body and possible content type
     let mut body: Option<String> = None;
     let mut json: bool = false;
     if let Some(body_str) = matches.value_of("body") {
@@ -52,6 +38,21 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
         };
         json = true;
     }
+
+    let headers = match matches.values_of("header") {
+        Some(values) => {
+            let mut headers = http::headers::Headers::new();
+            for val in values {
+                let splits: Vec<&str> = val.splitn(2, ':').collect();
+                headers.add(splits[0], splits[1]);
+            }
+            if json {
+                headers.add("Content-Type", "application/json");
+            }
+            Some(headers)
+        },
+        None => None
+    };
 
     let input = Input{
         url: matches.value_of("url").unwrap().to_string(),
@@ -123,7 +124,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
         )
         .arg(
             Arg::new("json")
-                .about("Send body with application/json Content-Type")
+                .about("Send body with Content-Type:application/json")
                 .long("json")
                 .conflicts_with("body")
                 .takes_value(true)

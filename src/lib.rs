@@ -23,10 +23,10 @@ pub fn process(args: &Vec<String>) {
 
 fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
     let inout = inout::parse_args(args)?;
-    perform(inout)
+    handle_input(inout)
 }
 
-fn perform(inout: inout::InOut) -> Result<(),Error> {
+fn handle_input(inout: inout::InOut) -> Result<(),Error> {
     let request = setup_request(inout.input)?;
     let response = send_request(&request)?;
     let output = OutputJson {
@@ -61,18 +61,15 @@ fn query_header(header: &str, headers: http::headers::Headers) {
 }
 
 fn setup_request(input: inout::Input) -> Result<request::Request, Error> {
-    let mut request = Request::new(input.method, input.url.as_str())?;
-    if let Some(headers) = input.headers {
-        request.headers.append(headers);
+    match input.body {
+        Some(body) => {
+            match input.json {
+                true => Request::with_json(input.method, &input.url, input.headers, &body),
+                false => Request::with_body(input.method, &input.url, input.headers, &body),
+            }
+        },
+        None => Request::new(input.method, &input.url, input.headers)
     }
-    if let Some(body) = &input.body {
-        request.set_body(body);
-        if input.json {
-            request.headers.add("Content-Type", "application/json")
-        }
-    }
-
-    Ok(request)
 }
 
 fn send_request(request: &http::request::Request) -> Result<http::response::Response, Error> {
