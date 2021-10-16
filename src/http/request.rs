@@ -12,6 +12,7 @@ pub struct Request {
     pub protocol: String,
     pub method: Method,
     path: String,
+    full_path: String,
     pub headers: Headers,
     body: Option<String>,
     pub domain: Option<String>,
@@ -34,6 +35,7 @@ impl Request {
             protocol: String::from("HTTP/1.1"),
             method,
             path: url_details.path,
+            full_path: parsed_url.to_string(),
             headers: hs,
             body: None,
             domain: url_details.domain,
@@ -54,11 +56,11 @@ impl Request {
         Ok(request)
     }
 
-    pub fn build(&self) -> String {
+    fn build_request(&self, path: &str) -> String {
         let mut message = format!(
             "{method} {path} {protocol}\r\n",
             method = self.method.to_string(),
-            path = self.path,
+            path = path,
             protocol = self.protocol,
         );
 
@@ -84,6 +86,14 @@ impl Request {
         // Done
         message.push_str("\r\n\r\n");        
         message
+    }
+
+    pub fn build(&self) -> String {
+        self.build_request(&self.path)
+    }
+
+    pub fn build_proxy(&self) -> String {
+        self.build_request(&self.full_path)
     }
 }
 

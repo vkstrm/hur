@@ -46,9 +46,6 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
                 let splits: Vec<&str> = val.splitn(2, ':').collect();
                 headers.add(splits[0], splits[1]);
             }
-            if json {
-                headers.add("Content-Type", "application/json");
-            }
             Some(headers)
         },
         None => None

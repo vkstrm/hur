@@ -12,7 +12,7 @@ pub enum Method {
     // OPTIONS,
     // TRACE,
     // PATCH,
-    // CONNECT,
+    CONNECT,
 }
 
 impl std::fmt::Display for Method {
