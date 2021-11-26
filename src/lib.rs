@@ -29,21 +29,40 @@ fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
 fn handle_input(inout: inout::InOut) -> Result<(),Error> {
     let request = setup_request(inout.input)?;
 
-    let response = match std::env::var("HTTP_PROXY") {
-        Ok(proxy) => {
-            let addrs = proxy_address(&proxy)?;
-            let connector = connector::Connector::new(addrs[0])?;
-            send_proxy_request(connector, &request)?
+    let response = match proxy()? {
+        Some(addrs) => {
+            match request.scheme.as_str() {
+                "http" => connector::http_request(addrs[0], &request.build_http_proxy())?,
+                "https" => {
+                    let domain = request.domain.as_ref().unwrap().clone();
+                    connector::proxy_https_request(addrs[0], &domain, &request.build())?
+                },
+                _ => Err(Error::new("only http/s supported"))?
+            }
         },
-        Err(_) => {
-            let connector = connector::Connector::new(request.servers[0])?;
-            send_request(connector, &request)?
+        None => {
+            let domain = request.domain.as_ref().ok_or("No domain").unwrap().clone();
+            match request.scheme.as_str() {
+                "http" => connector::http_request(request.servers[0], &request.build())?,
+                "https" => connector::https_request(request.servers[0], &domain,&request.build())?, 
+                _ => Err(Error::new("only http/s supported"))?
+            }
         }
     };
 
     handle_output(&response, &request, inout.output);
 
     Ok(())
+}
+
+fn proxy() -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
+    // TODO Check https proxy, check no_proxy
+    match std::env::var("HTTP_PROXY") {
+        Ok(proxy) => {
+            Ok(Some(proxy_address(&proxy)?))
+        },
+        Err(_) => Ok(None),
+    }
 }
 
 fn proxy_address(proxy: &str) -> Result<Vec<std::net::SocketAddr>, Error> {
@@ -62,22 +81,6 @@ fn proxy_address(proxy: &str) -> Result<Vec<std::net::SocketAddr>, Error> {
 
     let proxy = format!("{}:{}", domain, port);
     Ok(proxy.to_socket_addrs()?.collect())
-}
-
-fn send_request(connector: connector::Connector, request: &http::request::Request) -> Result<http::response::Response, Error> {
-    match request.scheme.as_str() {
-        "http" => connector.send_http_request(&request.build()),
-        "https" => connector.send_https_request( &request.build(), &request.domain),
-        _ => Err(Error::new("only http/s supported")),
-    }
-}
-
-fn send_proxy_request(connector: connector::Connector, request: &http::request::Request) -> Result<http::response::Response, Error> {
-    match request.scheme.as_str() {
-        "http" => connector.send_http_request(&request.build_proxy()),
-        "https" => connector.send_https_request( &request.build_proxy(), &request.domain),
-        _ => Err(Error::new("only http/s supported")),
-    }
 }
 
 fn handle_output(response: &http::response::Response, request: &http::request::Request, output: inout::Output) {

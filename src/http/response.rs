@@ -16,11 +16,28 @@ impl Response {
         let response_string = String::from_utf8_lossy(response);
         let raw = Some(response_string.clone().into_owned());
         let mut lines = response_string.lines();
-        let status_line = lines.next();
-        if status_line.is_none() { 
-            return Err(Error::new("no status line in response"))
+        
+        let status_line: &str;
+        loop {
+            let line = lines.next();
+            if line.is_none() {
+                return Err(Error::new("no status line in response"))
+            }
+
+            let line = line.unwrap();
+            if line.is_empty() {
+                continue;
+            }
+
+            status_line = line;
+            break;
         }
-        let splits: Vec<&str> = status_line.unwrap().splitn(3, ' ').collect();
+
+        let splits: Vec<&str> = status_line.splitn(3, ' ').collect();
+        if splits.len() != 3 {
+            return Err(Error::new("Weird status line"))
+        }
+
         let protocol = splits[0].to_string();
         let status_code = splits[1].parse::<i32>().unwrap();
         let reason_phrase = splits[2].to_string();

@@ -12,12 +12,13 @@ pub struct Request {
     pub protocol: String,
     pub method: Method,
     path: String,
-    full_path: String,
+    pub full_path: String,
     pub headers: Headers,
     body: Option<String>,
     pub domain: Option<String>,
     pub scheme: String,
-    pub servers: Vec<SocketAddr>
+    pub servers: Vec<SocketAddr>,
+    host: String,
 }
 
 impl Request {
@@ -26,7 +27,7 @@ impl Request {
         let url_details = UrlDetails::from_url(&parsed_url);
         let servers = url_details.find_socket_addresses()?;
         let mut hs = Headers::new();
-        hs.add("Host", &url_details.host);
+        hs.add("Host", &format!("{0}", url_details.host.as_str()));
         hs.add("Connection", "close");
         if let Some(headers) = headers {
             hs.append(headers);
@@ -41,6 +42,7 @@ impl Request {
             domain: url_details.domain,
             scheme: url_details.scheme,
             servers,
+            host: url_details.host,
         })
     }
 
@@ -92,7 +94,7 @@ impl Request {
         self.build_request(&self.path)
     }
 
-    pub fn build_proxy(&self) -> String {
+    pub fn build_http_proxy(&self) -> String {
         self.build_request(&self.full_path)
     }
 }
