@@ -1,6 +1,6 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
-use super::Method;
+use super::{Method, Scheme};
 use super::headers::Headers;
 use url::Url;
 use serde::Serialize;
@@ -16,7 +16,7 @@ pub struct Request {
     pub headers: Headers,
     body: Option<String>,
     pub domain: Option<String>,
-    pub scheme: String,
+    pub scheme: Scheme,
     pub servers: Vec<SocketAddr>,
     host: String,
 }
@@ -24,7 +24,7 @@ pub struct Request {
 impl Request {
     pub fn new(method: Method, url: &str, headers: Option<Headers>) -> Result<Request, Error> {
         let parsed_url = parse_url(url)?;
-        let url_details = UrlDetails::from_url(&parsed_url);
+        let url_details = UrlDetails::from_url(&parsed_url)?;
         let servers = url_details.find_socket_addresses()?;
         let mut hs = Headers::new();
         hs.add("Host", &format!("{0}", url_details.host.as_str()));
@@ -115,12 +115,12 @@ struct UrlDetails {
     domain: Option<String>,
     port: Option<u16>,
     host: String,
-    scheme: String,
+    scheme: Scheme,
 }
 
 impl UrlDetails {
-    pub fn from_url(url: &url::Url) -> UrlDetails {
-        UrlDetails {
+    pub fn from_url(url: &url::Url) -> Result<UrlDetails, Error> {
+        Ok(UrlDetails {
             path: url.path().to_string(),
             domain: match url.domain() {
                 Some(domain) => Some(domain.to_string()),
@@ -131,8 +131,12 @@ impl UrlDetails {
                 Some(host) => host.to_string(),
                 None => String::new(),
             },
-            scheme: url.scheme().to_string()
-        }
+            scheme: match url.scheme() {
+                "http" => Scheme::HTTP,
+                "https" => Scheme::HTTPS,
+                _ => return Err(Error::new("only support http/s"))
+            }
+        })
     }
 
     pub fn find_socket_addresses(&self) -> Result<Vec<SocketAddr>, Error> {
@@ -145,10 +149,9 @@ impl UrlDetails {
         match self.port {
             Some(port) => server_details.push_str(&port.to_string()),
             None => {
-                match self.scheme.as_str() {
-                    "https" => server_details.push_str("443"),
-                    "http" => server_details.push_str("80"),
-                    _ => return Err(Error::new("only support http/s"))
+                match self.scheme {
+                    Scheme::HTTPS => server_details.push_str("443"),
+                    Scheme::HTTP => server_details.push_str("80")
                 }
             }
         }

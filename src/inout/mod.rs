@@ -78,6 +78,12 @@ fn get_method(method: &str) -> http::Method {
         "get" => http::Method::GET,
         "post" => http::Method::POST,
         "put" => http::Method::PUT,
+        "delete" => http::Method::DELETE,
+        "patch" => http::Method::PATCH,
+        "connect" => http::Method::CONNECT,
+        "options" => http::Method::OPTIONS,
+        "trace" => http::Method::TRACE,
+        "head" => http::Method::HEAD, 
         _ => http::Method::GET,
     }
 }
@@ -102,7 +108,17 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
                 .takes_value(true)
                 .short('m')
                 .default_value("get")
-                .possible_values(&["get","post","put"])
+                .possible_values(&[
+                    "get",
+                    "post",
+                    "put",
+                    "trace",
+                    "patch",
+                    "delete",
+                    "head",
+                    "options",
+                    "connect"
+                    ])
         )
         .arg(
             Arg::new("header")

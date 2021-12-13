@@ -29,35 +29,39 @@ fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
 fn handle_input(inout: inout::InOut) -> Result<(),Error> {
     let request = setup_request(inout.input)?;
 
-    let response = match proxy()? {
+    let response = match proxy(&request.scheme)? {
         Some(addrs) => {
-            match request.scheme.as_str() {
-                "http" => connector::http_request(addrs[0], &request.build_http_proxy())?,
-                "https" => {
+            match request.scheme {
+                http::Scheme::HTTP => connector::http_request(addrs[0], &request.build_http_proxy())?,
+                http::Scheme::HTTPS => {
                     let domain = request.domain.as_ref().unwrap().clone();
                     connector::proxy_https_request(addrs[0], &domain, &request.build())?
                 },
-                _ => Err(Error::new("only http/s supported"))?
             }
         },
         None => {
             let domain = request.domain.as_ref().ok_or("No domain").unwrap().clone();
-            match request.scheme.as_str() {
-                "http" => connector::http_request(request.servers[0], &request.build())?,
-                "https" => connector::https_request(request.servers[0], &domain,&request.build())?, 
-                _ => Err(Error::new("only http/s supported"))?
+            match request.scheme {
+                http::Scheme::HTTP => connector::http_request(request.servers[0], &request.build())?,
+                http::Scheme::HTTPS => connector::https_request(request.servers[0], &domain,&request.build())?, 
             }
         }
     };
 
-    handle_output(&response, &request, inout.output);
-
-    Ok(())
+    handle_output(&response, &request, inout.output)
 }
 
-fn proxy() -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
-    // TODO Check https proxy, check no_proxy
-    match std::env::var("HTTP_PROXY") {
+fn proxy(schema: &http::Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
+    let proxy_key: String;
+    match schema {
+        http::Scheme::HTTP => {
+            proxy_key = "HTTP_PROXY".to_string()
+        },
+        http::Scheme::HTTPS => {
+            proxy_key = "HTTPS_PROXY".to_string()
+        }
+    }
+    match std::env::var(proxy_key) {
         Ok(proxy) => {
             Ok(Some(proxy_address(&proxy)?))
         },
@@ -83,9 +87,9 @@ fn proxy_address(proxy: &str) -> Result<Vec<std::net::SocketAddr>, Error> {
     Ok(proxy.to_socket_addrs()?.collect())
 }
 
-fn handle_output(response: &http::response::Response, request: &http::request::Request, output: inout::Output) {
+fn handle_output(response: &http::response::Response, request: &http::request::Request, output: inout::Output) -> Result<(), Error> {
     if output.verbose {
-        print_verbose(response, request);
+        print_verbose(response, request)?;
     } else if let Some(h) = output.query_header {
         query_header(&h, &response.headers)
     } else {
@@ -94,16 +98,17 @@ fn handle_output(response: &http::response::Response, request: &http::request::R
             None => {},
         }
     }
+    Ok(())
 }
 
-// TODO Return result
-fn print_verbose(response: &http::response::Response, request: &http::request::Request) {
+fn print_verbose(response: &http::response::Response, request: &http::request::Request) -> Result<(), Error>{
     let output_json = OutputJson {
         request,
         response
     };
-    let json = serde_json::to_string_pretty(&output_json).unwrap(); // Dont unwrap!
+    let json = serde_json::to_string_pretty(&output_json)?;
     println!("{}", json);
+    Ok(())
 }
 
 fn query_header(header: &str, headers: &http::headers::Headers) {

@@ -53,7 +53,7 @@ impl Response {
             headers.add(splits[0], splits[1].trim());
         }
 
-        // Collect body
+        // Collect body // TODO Ignore if request was HEAD
         let mut body_string = String::new();
         for line in lines {
             body_string.push_str(&format!("{line}\n",line = line));
