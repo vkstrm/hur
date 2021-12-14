@@ -3,6 +3,8 @@ use super::error::Error;
 
 use clap::{ArgMatches, App, Arg};
 
+pub mod output;
+
 pub struct Input {
     pub url: String,
     pub method: http::Method,
@@ -11,14 +13,9 @@ pub struct Input {
     pub json: bool
 }
 
-pub struct Output {
-    pub verbose: bool,
-    pub query_header: Option<String>
-}
-
 pub struct InOut {
     pub input: Input,
-    pub output: Output,
+    pub output: output::Output,
 }
 
 pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
@@ -59,7 +56,7 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
         json
     };
 
-    let output = Output {
+    let output = output::Output {
         verbose: matches.is_present("verbose"),
         query_header: match matches.value_of("query-header") {
             Some(q) => Some(String::from(q.trim())),

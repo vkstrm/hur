@@ -4,7 +4,7 @@ use crate::error::Error;
 #[derive(serde::Serialize, Debug)]
 pub struct Response {
     pub protocol: String,
-    pub status_code: i32,
+    pub status_code: u32,
     pub reason_phrase: String,
     pub headers: Headers,
     pub body: Option<String>,
@@ -35,11 +35,11 @@ impl Response {
 
         let splits: Vec<&str> = status_line.splitn(3, ' ').collect();
         if splits.len() != 3 {
-            return Err(Error::new("Weird status line"))
+            return Err(Error::new("could not parse status line"))
         }
 
         let protocol = splits[0].to_string();
-        let status_code = splits[1].parse::<i32>().unwrap();
+        let status_code = splits[1].parse::<u32>().unwrap();
         let reason_phrase = splits[2].to_string();
 
         // Collect headers

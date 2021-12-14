@@ -18,7 +18,7 @@ pub struct Request {
     pub domain: Option<String>,
     pub scheme: Scheme,
     pub servers: Vec<SocketAddr>,
-    host: String,
+    pub host: String,
 }
 
 impl Request {
@@ -27,11 +27,13 @@ impl Request {
         let url_details = UrlDetails::from_url(&parsed_url)?;
         let servers = url_details.find_socket_addresses()?;
         let mut hs = Headers::new();
+
         hs.add("Host", &format!("{0}", url_details.host.as_str()));
         hs.add("Connection", "close");
         if let Some(headers) = headers {
             hs.append(headers);
         }
+
         Ok(Request{
             protocol: String::from("HTTP/1.1"),
             method,
