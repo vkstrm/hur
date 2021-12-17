@@ -93,7 +93,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
-                .about("Print request and response in full")
+                .help("Print request and response in full")
         )
         .arg(
             Arg::new("url")
@@ -119,7 +119,7 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
         )
         .arg(
             Arg::new("header")
-                .about("Header for request")
+                .help("Header for request")
                 .takes_value(true)
                 .short('h')
                 .long("header")
@@ -127,21 +127,21 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
         )
         .arg(
             Arg::new("body")
-                .about("Body for request")
+                .help("Body for request")
                 .long("body")
                 .conflicts_with("json")
                 .takes_value(true)
         )
         .arg(
             Arg::new("json")
-                .about("Send body with Content-Type:application/json")
+                .help("Send body with Content-Type:application/json")
                 .long("json")
                 .conflicts_with("body")
                 .takes_value(true)
         )
         .arg(
             Arg::new("query-header")
-                .about("Query for a specific header from the response")
+                .help("Query for a specific header from the response")
                 .long("query-header")
                 .takes_value(true)
         )
