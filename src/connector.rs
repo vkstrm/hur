@@ -10,6 +10,7 @@ type Response = http::response::Response;
 
 
 pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Response, Error> {
+    log::info!("Connecting to {}", addr.to_string());
     let mut stream = TcpStream::connect(addr)?;
     let mut response_buffer = Vec::new();
  
@@ -18,6 +19,7 @@ pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Response, Err
 }
 
 pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Result<Response, Error> {
+    log::info!("Connecting to {}", addr.to_string());
     let stream = TcpStream::connect(addr)?;
     let mut response_buffer = Vec::new();
 
@@ -26,6 +28,7 @@ pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Resul
 }
 
 pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Response, Error> {
+    log::info!("Performing CONNECT request to proxy {}", proxy_addr.to_string());
     let mut connect_buffer: [u8; 39] = [0; 39];
     let mut stream = TcpStream::connect(proxy_addr)?;
     let connect_message = format!("CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n", domain); 
@@ -35,6 +38,7 @@ pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &s
     if !connect_buffer.starts_with(b"HTTP/1.1 200") && !connect_buffer.ends_with(b"\r\n\r\n") {
         return Err(Error::new("connect request failed"));
     }
+    log::info!("CONNECT request to proxy was succesful");
 
     tls_request(stream, domain, request_str.as_bytes())
 }

@@ -1,5 +1,6 @@
 use super::http;
 use super::error::Error;
+use super::logs;
 
 use clap::{ArgMatches, App, Arg};
 
@@ -56,6 +57,10 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
         json
     };
 
+    if matches.is_present("info") {
+        enable_logging()?;
+    }
+
     let output = output::Output {
         verbose: matches.is_present("verbose"),
         query_header: match matches.value_of("query-header") {
@@ -68,6 +73,11 @@ pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
         input,
         output
     })
+}
+
+fn enable_logging() -> Result<(), log::SetLoggerError> {
+    static LOGGER: logs::Logger = logs::Logger;
+    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
 }
 
 fn get_method(method: &str) -> http::Method {
@@ -93,7 +103,12 @@ fn use_clap(args: &Vec<String>) -> ArgMatches {
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
-                .help("Print request and response in full")
+                .about("Full request and response output in JSON")
+        )
+        .arg(
+            Arg::new("info")
+                .long("info")
+                .about("Show info logging")
         )
         .arg(
             Arg::new("url")

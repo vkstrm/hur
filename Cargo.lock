@@ -133,6 +133,7 @@ name = "hur"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "log",
  "native-tls",
  "regex",
  "serde",

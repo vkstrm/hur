@@ -3,6 +3,7 @@ mod http;
 mod connector;
 mod inout;
 mod proxy;
+mod logs;
 
 use error::Error;
 use http::request::{self, Request};
