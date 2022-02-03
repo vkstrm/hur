@@ -28,6 +28,7 @@ impl Request {
         let servers = url_details.find_socket_addresses()?;
         let mut hs = Headers::new();
 
+        hs.add("User-Agent", &format!("{}/{}", clap::crate_name!(), clap::crate_version!()));
         hs.add("Host", &format!("{0}", url_details.host.as_str()));
         hs.add("Connection", "close");
         if let Some(headers) = headers {
