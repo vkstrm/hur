@@ -2,7 +2,7 @@ use super::http;
 use super::error::Error;
 use super::logs;
 
-use clap::{ArgMatches, App, Arg};
+use clap::{ArgMatches, Arg, crate_version, crate_authors, crate_name};
 
 pub mod output;
 
@@ -97,18 +97,19 @@ fn get_method(method: &str) -> http::Method {
 
 fn use_clap(args: &Vec<String>) -> ArgMatches {
     return
-    App::new("hur")
-        .version("v0.1.0")
+    clap::app_from_crate!(crate_name!())
+        .version(crate_version!())
+        .author(crate_authors!("\n"))
         .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
-                .about("Full request and response output in JSON")
+                .help("Full request and response output in JSON")
         )
         .arg(
             Arg::new("info")
                 .long("info")
-                .about("Show info logging")
+                .help("Show info logging")
         )
         .arg(
             Arg::new("url")
