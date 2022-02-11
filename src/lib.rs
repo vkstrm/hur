@@ -6,7 +6,9 @@ mod proxy;
 mod logs;
 
 use error::Error;
-use http::request::{self, Request};
+use http::{Scheme, UrlDetails, request::Request, headers::Headers};
+use url::Url;
+use inout::{InOut, Input, output::handle_output};
 
 pub fn process(args: &Vec<String>) {
     match handle_arguments(&args) {
@@ -20,13 +22,17 @@ fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
     handle_input(inout)
 }
 
-fn handle_input(inout: inout::InOut) -> Result<(),Error> {
-    let request = setup_request(inout.input)?;
+fn handle_input(inout: InOut) -> Result<(),Error> {
+    let parsed_url = parse_url(&inout.input.url)?;
+    let url_details = UrlDetails::from_url(&parsed_url)?;
+
+    let request = setup_request(inout.input, url_details)?;
+
     let response = match proxy::should_proxy(&request)? {
         Some(addrs) => {
             match request.scheme {
-                http::Scheme::HTTP => connector::http_request(addrs[0], &request.build_http_proxy())?,
-                http::Scheme::HTTPS => {
+                Scheme::HTTP => connector::http_request(addrs[0], &request.build_http_proxy())?,
+                Scheme::HTTPS => {
                     let domain = request.domain.as_ref().unwrap().clone();
                     connector::proxy_https_request(addrs[0], &domain, &request.build())?
                 },
@@ -35,23 +41,44 @@ fn handle_input(inout: inout::InOut) -> Result<(),Error> {
         None => {
             let domain = request.domain.as_ref().ok_or("No domain").unwrap().clone();
             match request.scheme {
-                http::Scheme::HTTP => connector::http_request(request.servers[0], &request.build())?,
-                http::Scheme::HTTPS => connector::https_request(request.servers[0], &domain,&request.build())?, 
+                Scheme::HTTP => connector::http_request(request.servers[0], &request.build())?,
+                Scheme::HTTPS => connector::https_request(request.servers[0], &domain,&request.build())?, 
             }
         }
     };
 
-    inout::output::handle_output(&response, &request, inout.output)
+    handle_output(&response, &request, inout.output)
 }
 
-fn setup_request(input: inout::Input) -> Result<request::Request, Error> {
-    match input.body {
-        Some(body) => {
-            match input.json {
-                true => Request::with_json(input.method, &input.url, input.headers, &body),
-                false => Request::with_body(input.method, &input.url, input.headers, &body),
-            }
-        },
-        None => Request::new(input.method, &input.url, input.headers)
+fn standard_headers(input_headers: Option<Headers>, host: &str) -> Headers {
+    let mut hs = Headers::new();
+    hs.add("User-Agent", &format!("{}/{}", clap::crate_name!(), clap::crate_version!()));
+    hs.add("Host", host);
+    hs.add("Connection", "close");
+    if let Some(headers) = input_headers {
+        hs.append(headers);
     }
+    hs
+}
+
+fn setup_request(input: Input, url_details: UrlDetails) -> Result<Request, Error> {
+    let mut headers = standard_headers(input.headers, &url_details.host);
+    if input.json {
+        headers.add("Content-Type", "application/json");
+    }
+    match input.body {
+        Some(body) => Request::with_body(input.method, url_details, headers, &body),
+        None => Request::new(input.method, url_details, headers)
+    }
+}
+
+fn parse_url(url: &str) -> Result<Url, Error> {
+    let parsed_url = match Url::parse(url) {
+        Ok(url) => url,
+        Err(why) => return Err(Error::new(&why.to_string()))
+    };
+    if !parsed_url.has_host() {
+        return Err(Error::new("no host in input"))
+    }
+    Ok(parsed_url)
 }

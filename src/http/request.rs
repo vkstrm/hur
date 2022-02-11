@@ -1,8 +1,7 @@
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 
-use super::{Method, Scheme};
+use super::{Method, Scheme, UrlDetails};
 use super::headers::Headers;
-use url::Url;
 use serde::Serialize;
 
 use crate::error::Error;
@@ -22,25 +21,15 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(method: Method, url: &str, headers: Option<Headers>) -> Result<Request, Error> {
-        let parsed_url = parse_url(url)?;
-        let url_details = UrlDetails::from_url(&parsed_url)?;
+    pub fn new(method: Method, url_details: UrlDetails, headers: Headers) -> Result<Request, Error> {
         let servers = url_details.find_socket_addresses()?;
-        let mut hs = Headers::new();
-
-        hs.add("User-Agent", &format!("{}/{}", clap::crate_name!(), clap::crate_version!()));
-        hs.add("Host", &format!("{0}", url_details.host.as_str()));
-        hs.add("Connection", "close");
-        if let Some(headers) = headers {
-            hs.append(headers);
-        }
 
         Ok(Request{
             protocol: String::from("HTTP/1.1"),
             method,
             path: url_details.path,
-            full_path: parsed_url.to_string(),
-            headers: hs,
+            full_path: url_details.full_path,
+            headers,
             body: None,
             domain: url_details.domain,
             scheme: url_details.scheme,
@@ -49,15 +38,9 @@ impl Request {
         })
     }
 
-    pub fn with_body(method: Method, url: &str, headers: Option<Headers>, body: &str) -> Result<Request, Error> {
+    pub fn with_body(method: Method, url: UrlDetails, headers: Headers, body: &str) -> Result<Request, Error> {
         let mut request = Request::new(method, url, headers)?;
         request.body = Some(body.to_string());
-        Ok(request)
-    }
-
-    pub fn with_json(method: Method, url: &str, headers: Option<Headers>, body: &str) -> Result<Request, Error> {
-        let mut request = Request::with_body(method, url, headers, body)?;
-        request.headers.add("Content-Type", "application/json");
         Ok(request)
     }
 
@@ -99,65 +82,5 @@ impl Request {
 
     pub fn build_http_proxy(&self) -> String {
         self.build_request(&self.full_path)
-    }
-}
-
-fn parse_url(url: &str) -> Result<url::Url, Error> {
-    let parsed_url = match Url::parse(url) {
-        Ok(url) => url,
-        Err(why) => return Err(Error::new(&why.to_string()))
-    };
-    if !parsed_url.has_host() {
-        return Err(Error::new("no host in input"))
-    }
-    Ok(parsed_url)
-}
-
-struct UrlDetails {
-    path: String,
-    domain: Option<String>,
-    port: Option<u16>,
-    host: String,
-    scheme: Scheme,
-}
-
-impl UrlDetails {
-    pub fn from_url(url: &url::Url) -> Result<UrlDetails, Error> {
-        Ok(UrlDetails {
-            path: url.path().to_string(),
-            domain: match url.domain() {
-                Some(domain) => Some(domain.to_string()),
-                None => None,
-            },
-            port: url.port(),
-            host: match url.host_str() {
-                Some(host) => host.to_string(),
-                None => String::new(),
-            },
-            scheme: match url.scheme() {
-                "http" => Scheme::HTTP,
-                "https" => Scheme::HTTPS,
-                _ => return Err(Error::new("only support http/s"))
-            }
-        })
-    }
-
-    pub fn find_socket_addresses(&self) -> Result<Vec<SocketAddr>, Error> {
-        let mut server_details = String::new();
-        match &self.domain {
-            Some(domain) => server_details.push_str(domain.as_str()),
-            None => server_details.push_str(&self.host), 
-        };
-        server_details.push(':');
-        match self.port {
-            Some(port) => server_details.push_str(&port.to_string()),
-            None => {
-                match self.scheme {
-                    Scheme::HTTPS => server_details.push_str("443"),
-                    Scheme::HTTP => server_details.push_str("80")
-                }
-            }
-        }
-        Ok(server_details.to_socket_addrs()?.collect())
     }
 }
