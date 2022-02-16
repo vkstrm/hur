@@ -54,7 +54,7 @@ impl From<serde_json::error::Error> for Error {
 impl From<log::SetLoggerError> for Error {
     fn from(err: log::SetLoggerError) -> Self {
         Error {
-            message: String::from(err.to_string())
+            message: err.to_string()
         }
     }
 }

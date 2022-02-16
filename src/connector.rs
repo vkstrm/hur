@@ -38,7 +38,7 @@ pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &s
     if !connect_buffer.starts_with(b"HTTP/1.1 200") && !connect_buffer.ends_with(b"\r\n\r\n") {
         return Err(Error::new("connect request failed"));
     }
-    log::info!("CONNECT request to proxy was succesful");
+    log::info!("CONNECT request to proxy was successful");
 
     tls_request(stream, domain, request_str.as_bytes())
 }

@@ -1,4 +1,4 @@
-use super::http;
+use super::http::{response::Response, headers::Headers};
 use crate::error::Error;
 
 pub struct Output {
@@ -6,15 +6,10 @@ pub struct Output {
     pub query_header: Option<String>
 }
 
-#[derive(serde::Serialize)]
-struct OutputJson<'a> {
-    request: &'a http::request::Request,
-    response: &'a http::response::Response
-}
-
-pub fn handle_output(response: &http::response::Response, request: &http::request::Request, output: Output) -> Result<(), Error> {
+pub fn handle_output(response: Response, request: serde_json::Value, output: Output) -> Result<(), Error> {
     if output.verbose {
-        print_verbose(response, request)?;
+        let json_output = serde_json::json!({"request": request, "response":response});
+        println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else if let Some(h) = output.query_header {
         query_header(&h, &response.headers)
     } else {
@@ -26,17 +21,7 @@ pub fn handle_output(response: &http::response::Response, request: &http::reques
     Ok(())
 }
 
-fn print_verbose(response: &http::response::Response, request: &http::request::Request) -> Result<(), Error>{
-    let output_json = OutputJson {
-        request,
-        response
-    };
-    let json = serde_json::to_string_pretty(&output_json)?;
-    println!("{}", json);
-    Ok(())
-}
-
-fn query_header(header: &str, headers: &http::headers::Headers) {
+fn query_header(header: &str, headers: &Headers) {
     let h = header.to_lowercase();
     for (key, value) in &headers.headers_map {
         if h == key.to_lowercase() {

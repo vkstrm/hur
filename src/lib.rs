@@ -1,3 +1,10 @@
+use std::net::SocketAddr;
+
+use error::Error;
+use http::{Scheme, UrlDetails, request::Request, headers::Headers, response::Response};
+use url::Url;
+use inout::{InOut, Input, output::handle_output};
+
 mod error;
 mod http;
 mod connector;
@@ -5,19 +12,14 @@ mod inout;
 mod proxy;
 mod logs;
 
-use error::Error;
-use http::{Scheme, UrlDetails, request::Request, headers::Headers};
-use url::Url;
-use inout::{InOut, Input, output::handle_output};
-
-pub fn process(args: &Vec<String>) {
-    match handle_arguments(&args) {
+pub fn process(args: Vec<String>) {
+    match handle_arguments(args) {
         Ok(()) => {},
         Err(why) => eprintln!("{}", why.to_string())
     }
 }
 
-fn handle_arguments(args: &Vec<String>) -> Result<(), Error> {
+fn handle_arguments(args: Vec<String>) -> Result<(), Error> {
     let inout = inout::parse_args(args)?;
     handle_input(inout)
 }
@@ -27,27 +29,98 @@ fn handle_input(inout: InOut) -> Result<(),Error> {
     let url_details = UrlDetails::from_url(&parsed_url)?;
 
     let request = setup_request(inout.input, url_details)?;
+    let request_output = serde_json::to_value(&request)?;
 
     let response = match proxy::should_proxy(&request)? {
-        Some(addrs) => {
-            match request.scheme {
-                Scheme::HTTP => connector::http_request(addrs[0], &request.build_http_proxy())?,
-                Scheme::HTTPS => {
-                    let domain = request.domain.as_ref().unwrap().clone();
-                    connector::proxy_https_request(addrs[0], &domain, &request.build())?
-                },
-            }
-        },
-        None => {
-            let domain = request.domain.as_ref().ok_or("No domain").unwrap().clone();
-            match request.scheme {
-                Scheme::HTTP => connector::http_request(request.servers[0], &request.build())?,
-                Scheme::HTTPS => connector::https_request(request.servers[0], &domain,&request.build())?, 
-            }
-        }
+        Some(proxy_addrs) => send_proxy_request(request, proxy_addrs)?,
+        None => send_request(request)?,
     };
 
-    handle_output(&response, &request, inout.output)
+    handle_output(response, request_output, inout.output)
+}
+
+fn send_proxy_request(request: Request, addrs: Vec<SocketAddr>) -> Result<Response, Error> {
+    match request.scheme {
+        Scheme::HTTP => try_proxy_http(request, addrs),
+        Scheme::HTTPS => try_proxy_https(request, addrs)
+    }
+}
+
+fn send_request(request: Request) -> Result<Response, Error> {
+    match request.scheme {
+        Scheme::HTTP => try_http(request),
+        Scheme::HTTPS => try_https(request)
+    }
+}
+
+fn try_http(request: Request) -> Result<Response, Error> {
+    let request_str = request.build();
+    for server in request.servers {
+        let server_str = server.to_string();
+        log::info!("Trying server {}", server_str);
+        match connector::http_request(server, &request_str) {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                log::warn!("Request to {} failed with error {}", server_str, err);
+                continue;
+            }
+        }
+    }
+
+    Err(Error::new("no server worked for request"))
+}
+
+fn try_https(request: Request) -> Result<Response, Error> {
+    let request_str = request.build();
+    let domain = request.domain.unwrap();
+    for server in request.servers {
+        let server_str = server.to_string();
+        log::info!("Trying server {}", server_str);
+        match connector::https_request(server, &domain, &request_str) {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                log::warn!("Request to {} failed with error {}", server_str, err);
+                continue;
+            }
+        }
+    }
+
+    Err(Error::new("no server worked for request"))
+}
+
+fn try_proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
+    let request_str = request.build_http_proxy();
+    for server in servers {
+        let server_str = server.to_string();
+        log::info!("Trying proxy server {}", server_str);
+        match connector::http_request(server, &request_str) {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                log::warn!("Request to {} failed with error {}", server_str, err);
+                continue;
+            }
+        }
+    }
+
+    Err(Error::new("no server worked for proxyed request"))
+}
+
+fn try_proxy_https(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
+    let domain = request.domain.as_ref().unwrap();
+    let request_str = request.build();
+    for server in servers {
+        let server_str = server.to_string();
+        log::info!("Trying proxy server {}", server_str);
+        match connector::proxy_https_request(server, domain, &request_str) {
+            Ok(response) => return Ok(response),
+            Err(err) => {
+                log::warn!("Request to {} failed with error {}", server_str, err);
+                continue;
+            }
+        }
+    }
+
+    Err(Error::new("no server worked for proxyed request"))
 }
 
 fn standard_headers(input_headers: Option<Headers>, host: &str) -> Headers {

@@ -19,7 +19,7 @@ pub struct InOut {
     pub output: output::Output,
 }
 
-pub fn parse_args(args: &Vec<String>) -> Result<InOut, Error> {
+pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
     let matches = use_clap(&args);
 
     let mut body: Option<String> = None;
