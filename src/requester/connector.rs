@@ -3,31 +3,27 @@ use std::io::{Read, Write};
 
 use native_tls::TlsConnector;
 
-use super::error::Error;
-use super::http;
+use crate::error::Error;
 
-type Response = http::response::Response;
-
-
-pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Response, Error> {
+pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error> {
     log::info!("Connecting to {}", addr.to_string());
     let mut stream = TcpStream::connect(addr)?;
     let mut response_buffer = Vec::new();
  
     do_http_request(&mut stream,request_str.as_bytes(), &mut response_buffer)?;
-    Response::from_response(&response_buffer)
+    Ok(response_buffer)
 }
 
-pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Result<Response, Error> {
+pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
     log::info!("Connecting to {}", addr.to_string());
     let stream = TcpStream::connect(addr)?;
     let mut response_buffer = Vec::new();
 
     do_https_request(stream, domain, request_str.as_bytes(), &mut response_buffer)?;
-    Response::from_response(&response_buffer)
+    Ok(response_buffer)
 }
 
-pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Response, Error> {
+pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
     log::info!("Performing CONNECT request to proxy {}", proxy_addr.to_string());
     let mut connect_buffer: [u8; 39] = [0; 39];
     let mut stream = TcpStream::connect(proxy_addr)?;
@@ -43,13 +39,13 @@ pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &s
     tls_request(stream, domain, request_str.as_bytes())
 }
 
-fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Response, Error> {
+fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Vec<u8>, Error> {
     let tls_connector = TlsConnector::new()?;
     let mut stream = tls_connector.connect(domain, stream)?;
-    let mut request_buffer: Vec<u8> = Vec::new();
+    let mut response_buffer: Vec<u8> = Vec::new();
 
-    write_read(&mut stream, &request, &mut request_buffer)?;
-    Response::from_response(&request_buffer)
+    write_read(&mut stream, &request, &mut response_buffer)?;
+    Ok(response_buffer)
 }
 
 fn do_http_request(stream: &mut TcpStream, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> {

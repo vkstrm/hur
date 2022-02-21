@@ -11,8 +11,8 @@ pub struct Response {
 }
 
 impl Response {
-    pub fn from_response(response: &[u8]) -> Result<Response, Error> {
-        let response_string = String::from_utf8_lossy(response);
+    pub fn from_buffer(buf: &[u8]) -> Result<Response, Error> {
+        let response_string = String::from_utf8_lossy(buf);
         let mut lines = response_string.lines();
         
         let status_line: &str;
