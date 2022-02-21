@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::http::{request::Request, response::Response};
 
-use log;
 use std::net::SocketAddr;
 
 mod connector;

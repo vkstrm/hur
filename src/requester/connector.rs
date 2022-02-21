@@ -29,8 +29,8 @@ pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &s
     let mut stream = TcpStream::connect(proxy_addr)?;
     let connect_message = format!("CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n", domain); 
 
-    stream.write(connect_message.as_bytes())?;
-    stream.read(&mut connect_buffer)?;
+    stream.write_all(connect_message.as_bytes())?;
+    stream.read_exact(&mut connect_buffer)?;
     if !connect_buffer.starts_with(b"HTTP/1.1 200") && !connect_buffer.ends_with(b"\r\n\r\n") {
         return Err(Error::new("connect request failed"));
     }
@@ -44,7 +44,7 @@ fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Vec<u8
     let mut stream = tls_connector.connect(domain, stream)?;
     let mut response_buffer: Vec<u8> = Vec::new();
 
-    write_read(&mut stream, &request, &mut response_buffer)?;
+    write_read(&mut stream, request, &mut response_buffer)?;
     Ok(response_buffer)
 }
 

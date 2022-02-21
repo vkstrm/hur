@@ -63,10 +63,7 @@ pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
 
     let output = output::Output {
         verbose: matches.is_present("verbose"),
-        query_header: match matches.value_of("query-header") {
-            Some(q) => Some(String::from(q.trim())),
-            None => None,
-        }
+        query_header: matches.value_of("query-header").map(|q| String::from(q.trim())),
     };
 
     Ok(InOut{
@@ -95,7 +92,7 @@ fn get_method(method: &str) -> http::Method {
     }
 }
 
-fn use_clap(args: &Vec<String>) -> ArgMatches {
+fn use_clap(args: &[String]) -> ArgMatches {
     return
     clap::app_from_crate!(crate_name!())
         .version(crate_version!())

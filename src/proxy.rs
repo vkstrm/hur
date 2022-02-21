@@ -6,7 +6,7 @@ use crate::error::Error;
 
 pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
     if let Some(no_proxy) = get_env("NO_PROXY") {
-        let no_proxy_splits: Vec<&str> = no_proxy.split(",").collect();
+        let no_proxy_splits: Vec<&str> = no_proxy.split(',').collect();
         for no_proxy_entry in no_proxy_splits {
             if request.host == no_proxy_entry  {
                 return Ok(None)
@@ -21,11 +21,11 @@ pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::
     proxy(&request.scheme)
 }
 
-fn no_proxy_server(servers: &Vec<std::net::SocketAddr>, no_proxy: &str) -> bool {
-    let no_proxy_splits: Vec<&str> = no_proxy.split(".").collect();
+fn no_proxy_server(servers: &[std::net::SocketAddr], no_proxy: &str) -> bool {
+    let no_proxy_splits: Vec<&str> = no_proxy.split('.').collect();
     for server in servers {
         let server_str = server.to_string();
-        let server_splits: Vec<&str> = server_str.split(".").collect();
+        let server_splits: Vec<&str> = server_str.split('.').collect();
 
         let i = 0;
         while i < no_proxy_splits.len() &&  i < server_splits.len() {
@@ -35,7 +35,7 @@ fn no_proxy_server(servers: &Vec<std::net::SocketAddr>, no_proxy: &str) -> bool 
         }
     }
 
-    return true
+    true
 }
 
 fn proxy(scheme: &http::Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {

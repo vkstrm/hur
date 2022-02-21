@@ -45,10 +45,7 @@ impl UrlDetails {
         Ok(UrlDetails {
             path: url.path().to_string(),
             full_path: url.to_string(),
-            domain: match url.domain() {
-                Some(domain) => Some(domain.to_string()),
-                None => None,
-            },
+            domain: url.domain().map(|domain| domain.to_string()),
             port: url.port(),
             host: match url.host_str() {
                 Some(host) => host.to_string(),

@@ -60,7 +60,7 @@ impl Display for Headers {
     }
 }
 
-fn capitalize(string: &String) -> String {
+fn capitalize(string: &str) -> String {
     let mut chars = string.chars();
     return chars.next().unwrap().to_uppercase().collect::<String>() + chars.as_str();
 }
