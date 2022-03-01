@@ -64,6 +64,7 @@ pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
     let output = output::Output {
         verbose: matches.is_present("verbose"),
         query_header: matches.value_of("query-header").map(|q| String::from(q.trim())),
+        no_body: matches.is_present("no-body"),
     };
 
     Ok(InOut{
@@ -157,6 +158,11 @@ fn use_clap(args: &[String]) -> ArgMatches {
                 .help("Query for a specific header from the response")
                 .long("query-header")
                 .takes_value(true)
+        )
+        .arg(
+            Arg::new("no-body")
+                .help("Don't print response body")
+                .long("no-body")
         )
         .get_matches_from(args);
 }
