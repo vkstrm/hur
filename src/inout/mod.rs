@@ -11,7 +11,8 @@ pub struct Input {
     pub method: http::Method,
     pub headers: Option<http::headers::Headers>,
     pub body: Option<String>,
-    pub json: bool
+    pub json: bool,
+    pub no_proxy: bool
 }
 
 pub struct InOut {
@@ -54,7 +55,8 @@ pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
-        json
+        json,
+        no_proxy: matches.is_present("no-proxy"),
     };
 
     if matches.is_present("info") {
@@ -163,6 +165,11 @@ fn use_clap(args: &[String]) -> ArgMatches {
             Arg::new("no-body")
                 .help("Don't print response body")
                 .long("no-body")
+        )
+        .arg(
+            Arg::new("no-proxy")
+                .help("Do not proxy request")
+                .long("no-proxy")
         )
         .get_matches_from(args);
 }

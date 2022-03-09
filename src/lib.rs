@@ -28,12 +28,18 @@ fn handle_input(inout: InOut) -> Result<(),Error> {
     let parsed_url = parse_url(&inout.input.url)?;
     let url_details = UrlDetails::from_url(&parsed_url)?;
 
+    let no_proxy = inout.input.no_proxy;
     let request = setup_request(inout.input, url_details)?;
     let request_output = serde_json::to_value(&request)?;
 
-    let response = match proxy::should_proxy(&request)? {
-        Some(proxy_addrs) => send_proxy_request(request, proxy_addrs)?,
-        None => send_request(request)?,
+    let proxy_addrs = match no_proxy {
+        false => proxy::should_proxy(&request)?,
+        true => None
+    };
+
+    let response = match proxy_addrs {
+        Some(addrs) => send_proxy_request(request, addrs)?,
+        None => send_request(request)?
     };
 
     handle_output(response, request_output, inout.output)
