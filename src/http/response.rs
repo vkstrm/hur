@@ -1,5 +1,6 @@
 use super::headers::Headers;
 use crate::error::Error;
+use crate::error;
 
 #[derive(serde::Serialize, Debug)]
 pub struct Response {
@@ -19,7 +20,7 @@ impl Response {
         loop {
             let line = lines.next();
             if line.is_none() {
-                return Err(Error::new("no status line in response"))
+                error!("no status line in response")
             }
 
             let line = line.unwrap();
@@ -33,7 +34,7 @@ impl Response {
 
         let splits: Vec<&str> = status_line.splitn(3, ' ').collect();
         if splits.len() != 3 {
-            return Err(Error::new("could not parse status line"))
+            error!("could not parse status line")
         }
 
         let protocol = splits[0].to_string();

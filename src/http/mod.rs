@@ -1,6 +1,7 @@
 use std::net::{SocketAddr, ToSocketAddrs};
 
 use crate::error::Error;
+use crate::error;
 
 pub mod response;
 pub mod request;
@@ -54,7 +55,7 @@ impl UrlDetails {
             scheme: match url.scheme() {
                 "http" => Scheme::HTTP,
                 "https" => Scheme::HTTPS,
-                _ => return Err(Error::new("only support http/s"))
+                _ => error!("only support http/s")
             }
         })
     }

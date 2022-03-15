@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::error;
 use crate::http::{request::Request, response::Response};
 
 use std::net::SocketAddr;
@@ -41,7 +42,7 @@ fn internal_https(func: HttpsFunc, servers: Vec<SocketAddr>, request: &str, doma
         }
     }
 
-    Err(Error::new("no server worked for request"))
+    error!("no server worked for request")
 }
 
 fn internal_http(func: HttpFunc, servers: Vec<SocketAddr>, request: &str) -> Result<Response, Error> {
@@ -57,5 +58,5 @@ fn internal_http(func: HttpFunc, servers: Vec<SocketAddr>, request: &str) -> Res
         }
     }
 
-    Err(Error::new("no server worked for request"))
+    error!("no server worked for request")
 }

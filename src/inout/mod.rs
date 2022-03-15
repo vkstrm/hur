@@ -1,6 +1,8 @@
 use super::http;
-use super::error::Error;
 use super::logs;
+
+use crate::error::Error;
+use crate::error;
 
 use clap::{ArgMatches, Arg, crate_version, crate_authors, crate_name};
 
@@ -33,7 +35,7 @@ pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
             Ok(_) => {
                 body = Some(body_str.to_string());
             },
-            Err(why) => return Err(Error::from(why)),
+            Err(why) => error!(&why.to_string()),
         };
         json = true;
     }

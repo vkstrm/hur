@@ -1,3 +1,13 @@
+#[macro_export]
+macro_rules! error {
+    ($msg:expr) => {
+        return Err(Error::new($msg))
+    };
+    ($msg:stmt) => {
+        return Err(Error::new($msg()))
+    }
+}
+
 #[derive(Debug)]
 pub struct Error {
     pub message: String,

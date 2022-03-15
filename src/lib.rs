@@ -25,11 +25,8 @@ fn handle_arguments(args: Vec<String>) -> Result<(), Error> {
 }
 
 fn handle_input(inout: InOut) -> Result<(),Error> {
-    let parsed_url = parse_url(&inout.input.url)?;
-    let url_details = UrlDetails::from_url(&parsed_url)?;
-
     let no_proxy = inout.input.no_proxy;
-    let request = setup_request(inout.input, url_details)?;
+    let request = setup_request(inout.input)?;
     let request_output = serde_json::to_value(&request)?;
 
     let proxy_addrs = match no_proxy {
@@ -70,7 +67,9 @@ fn standard_headers(input_headers: Option<Headers>, host: &str) -> Headers {
     hs
 }
 
-fn setup_request(input: Input, url_details: UrlDetails) -> Result<Request, Error> {
+fn setup_request(input: Input) -> Result<Request, Error> {
+    let parsed_url = parse_url(&input.url)?;
+    let url_details = UrlDetails::from_url(&parsed_url)?;
     let mut headers = standard_headers(input.headers, &url_details.host);
     if input.json {
         headers.add("Content-Type", "application/json");
@@ -84,10 +83,10 @@ fn setup_request(input: Input, url_details: UrlDetails) -> Result<Request, Error
 fn parse_url(url: &str) -> Result<Url, Error> {
     let parsed_url = match Url::parse(url) {
         Ok(url) => url,
-        Err(why) => return Err(Error::new(&why.to_string()))
+        Err(why) => error!(&why.to_string())
     };
     if !parsed_url.has_host() {
-        return Err(Error::new("no host in input"))
+        error!("no host in input");
     }
     Ok(parsed_url)
 }

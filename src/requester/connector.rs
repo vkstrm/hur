@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use native_tls::TlsConnector;
 
 use crate::error::Error;
+use crate::error;
 
 pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error> {
     log::info!("Connecting to {}", addr.to_string());
@@ -32,7 +33,7 @@ pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &s
     stream.write_all(connect_message.as_bytes())?;
     stream.read_exact(&mut connect_buffer)?;
     if !connect_buffer.starts_with(b"HTTP/1.1 200") && !connect_buffer.ends_with(b"\r\n\r\n") {
-        return Err(Error::new("connect request failed"));
+        error!("connect request failed");
     }
     log::info!("CONNECT request to proxy was successful");
 

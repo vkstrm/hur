@@ -3,6 +3,7 @@ use regex::Regex;
 
 use crate::http;
 use crate::error::Error;
+use crate::error;
 
 pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
     if let Some(no_proxy) = get_env("NO_PROXY") {
@@ -58,15 +59,15 @@ fn proxy(scheme: &http::Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Err
 fn proxy_address(proxy: &str) -> Result<Vec<std::net::SocketAddr>, Error> {
     let proxy = match url::Url::parse(proxy) {
         Ok(url) => url,
-        Err(why) => return Err(Error::new(&why.to_string()))
+        Err(why) => error!(&why.to_string())
     };
     let domain = match proxy.domain() {
         Some(domain) => domain,
-        None => return Err(Error::new("no domain in proxy url"))
+        None => error!("no domain in proxy url")
     };
     let port = match proxy.port() {
         Some(port) => port,
-        None => return Err(Error::new("no port in proxy url"))
+        None => error!("no port in proxy url")
     };
 
     let proxy = format!("{}:{}", domain, port);
