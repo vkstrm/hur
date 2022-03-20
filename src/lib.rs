@@ -49,24 +49,19 @@ fn no_proxy_request(request: Request) -> Result<Response, Error> {
 fn setup_request(input: Input) -> Result<Request, Error> {
     let parsed_url = parse_url(&input.url)?;
     let url_details = UrlDetails::from_url(&parsed_url)?;
-    let mut headers = standard_headers(input.headers, &url_details.host);
-    if input.json {
-        headers.add("Content-Type", "application/json");
-    }
+    let headers = standard_headers(input.headers, &url_details.host);
     match input.body {
         Some(body) => Request::with_body(input.method, url_details, headers, &body),
         None => Request::new(input.method, url_details, headers)
     }
 }
 
-fn standard_headers(input_headers: Option<Headers>, host: &str) -> Headers {
+fn standard_headers(input_headers: Headers, host: &str) -> Headers {
     let mut hs = Headers::new();
     hs.add("User-Agent", &format!("{}/{}", clap::crate_name!(), clap::crate_version!()));
     hs.add("Host", host);
     hs.add("Connection", "close");
-    if let Some(headers) = input_headers {
-        hs.append(headers);
-    }
+    hs.append(input_headers);
     hs
 }
 

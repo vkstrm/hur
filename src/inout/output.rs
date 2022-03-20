@@ -1,4 +1,4 @@
-use super::http::{response::Response, headers::Headers};
+use crate::http::{headers::Headers, response::Response};
 use crate::error::Error;
 
 pub struct Output {

@@ -1,4 +1,4 @@
-use super::http;
+use super::http::{Method, headers::Headers};
 use super::logs;
 
 use crate::error::Error;
@@ -10,10 +10,9 @@ pub mod output;
 
 pub struct Input {
     pub url: String,
-    pub method: http::Method,
-    pub headers: Option<http::headers::Headers>,
+    pub method: Method,
+    pub headers: Headers,
     pub body: Option<String>,
-    pub json: bool,
     pub no_proxy: bool
 }
 
@@ -24,40 +23,17 @@ pub struct InputOutput {
 
 pub fn parse_args(args: Vec<String>) -> Result<InputOutput, Error> {
     let matches = use_clap(&args);
-
-    let mut body: Option<String> = None;
-    let mut json: bool = false;
-    if let Some(body_str) = matches.value_of("body") {
-        body = Some(body_str.to_string());
-    }
-    if let Some(body_str) = matches.value_of("json") {
-        match serde_json::from_str::<serde_json::Value>(body_str) {
-            Ok(_) => {
-                body = Some(body_str.to_string());
-            },
-            Err(why) => error!(&why.to_string()),
-        };
-        json = true;
-    }
-
-    let headers = match matches.values_of("header") {
-        Some(values) => {
-            let mut headers = http::headers::Headers::new();
-            for val in values {
-                let splits: Vec<&str> = val.splitn(2, ':').collect();
-                headers.add(splits[0], splits[1]);
-            }
-            Some(headers)
-        },
-        None => None
-    };
+    let mut headers = collect_headers(matches.values_of("header"));
+    let body = collect_body(
+        matches.value_of("body"), 
+        matches.value_of("json"), 
+        &mut headers)?;
 
     let input = Input{
         url: matches.value_of("url").unwrap().to_string(),
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
-        json,
         no_proxy: matches.is_present("no-proxy"),
     };
 
@@ -77,23 +53,55 @@ pub fn parse_args(args: Vec<String>) -> Result<InputOutput, Error> {
     })
 }
 
+fn collect_headers(headers_option: Option<clap::Values>) -> Headers {
+    match headers_option {
+        Some(values) => {
+            let mut headers = Headers::new();
+            for val in values {
+                let splits: Vec<&str> = val.splitn(2, ':').collect();
+                headers.add(splits[0], splits[1]);
+            }
+            headers
+        },
+        None => Headers::new()
+    }
+}
+
+fn collect_body(body_option: Option<&str>, json_option: Option<&str>, headers: &mut Headers) -> Result<Option<String>, Error> {
+    let mut body: Option<String> = None;
+    if let Some(body_str) = body_option {
+        body = Some(body_str.to_string());
+    }
+    if let Some(body_str) = json_option {
+        match serde_json::from_str::<serde_json::Value>(body_str) {
+            Ok(_) => {
+                body = Some(body_str.to_string());
+                headers.add("Content-Type", "application/json");
+            },
+            Err(why) => error!(&why.to_string()),
+        };
+    }
+
+    Ok(body)
+}
+
 fn enable_logging() -> Result<(), log::SetLoggerError> {
     static LOGGER: logs::Logger = logs::Logger;
     log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
 }
 
-fn get_method(method: &str) -> http::Method {
+fn get_method(method: &str) -> Method {
     match method.to_lowercase().as_str() {
-        "get" => http::Method::GET,
-        "post" => http::Method::POST,
-        "put" => http::Method::PUT,
-        "delete" => http::Method::DELETE,
-        "patch" => http::Method::PATCH,
-        "connect" => http::Method::CONNECT,
-        "options" => http::Method::OPTIONS,
-        "trace" => http::Method::TRACE,
-        "head" => http::Method::HEAD, 
-        _ => http::Method::GET,
+        "get" => Method::GET,
+        "post" => Method::POST,
+        "put" => Method::PUT,
+        "delete" => Method::DELETE,
+        "patch" => Method::PATCH,
+        "connect" => Method::CONNECT,
+        "options" => Method::OPTIONS,
+        "trace" => Method::TRACE,
+        "head" => Method::HEAD, 
+        _ => Method::GET,
     }
 }
 
@@ -174,4 +182,28 @@ fn use_clap(args: &[String]) -> ArgMatches {
                 .long("no-proxy")
         )
         .get_matches_from(args);
+}
+
+#[test]
+fn test_collect_body() {
+    let mut headers = Headers::new();
+    let body_opt = Some("form1:value2");
+    let json_opt = None;
+
+    let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
+    assert!(body.is_some());
+    assert_eq!(body.unwrap(), "form1:value2");
+    assert!(headers.headers_map.is_empty());
+}
+
+#[test]
+fn test_collect_json_body() {
+    let mut headers = Headers::new();
+    let body_opt = None;
+    let json_opt = Some(r#"{"key":"value"}"#);
+
+    let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
+    assert!(body.is_some());
+    assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
+    assert!(headers.headers_map.contains_key("Content-Type"));
 }
