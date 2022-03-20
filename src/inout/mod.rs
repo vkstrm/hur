@@ -17,12 +17,12 @@ pub struct Input {
     pub no_proxy: bool
 }
 
-pub struct InOut {
+pub struct InputOutput {
     pub input: Input,
     pub output: output::Output,
 }
 
-pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
+pub fn parse_args(args: Vec<String>) -> Result<InputOutput, Error> {
     let matches = use_clap(&args);
 
     let mut body: Option<String> = None;
@@ -71,7 +71,7 @@ pub fn parse_args(args: Vec<String>) -> Result<InOut, Error> {
         no_body: matches.is_present("no-body"),
     };
 
-    Ok(InOut{
+    Ok(InputOutput{
         input,
         output
     })

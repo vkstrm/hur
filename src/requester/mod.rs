@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::error;
-use crate::http::{request::Request, response::Response};
+use crate::http::{request::Request, response::Response, Scheme};
 
 use std::net::SocketAddr;
 
@@ -9,22 +9,36 @@ mod connector;
 type HttpsFunc = fn(server: SocketAddr, request: &str, domain: &str) -> Result<Vec<u8>, Error>;
 type HttpFunc = fn(server: SocketAddr, request: &str) -> Result<Vec<u8>, Error>;
 
-pub fn http(request: Request) -> Result<Response, Error> {
+pub fn send_proxy_request(request: Request, addrs: Vec<SocketAddr>) -> Result<Response, Error> {
+    match request.scheme {
+        Scheme::HTTP => proxy_http(request, addrs),
+        Scheme::HTTPS => proxy_https(request, addrs)
+    }
+}
+
+pub fn send_request(request: Request) -> Result<Response, Error> {
+    match request.scheme {
+        Scheme::HTTP => http(request),
+        Scheme::HTTPS => https(request)
+    }
+}
+
+fn http(request: Request) -> Result<Response, Error> {
     let request_str = request.build();
     internal_http(connector::http_request, request.servers, &request_str)
 }
 
-pub fn https(request: Request) -> Result<Response, Error> {
+fn https(request: Request) -> Result<Response, Error> {
     let request_str = request.build();
     internal_https(connector::https_request, request.servers, &request_str, &request.domain.unwrap())
 }
 
-pub fn proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
+fn proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
     let request_str = request.build_http_proxy();
     internal_http(connector::http_request, servers, &request_str)
 }
 
-pub fn proxy_https(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
+fn proxy_https(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
     let request_str = request.build();
     internal_https(connector::proxy_https_request, servers, &request_str, &request.domain.unwrap())
 }
