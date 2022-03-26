@@ -6,7 +6,8 @@ mod logs;
 mod requester;
 
 use error::Error;
-use http::{UrlDetails, request::Request, headers::Headers, response::Response};
+use http::{request::Request, headers::Headers, response::Response};
+use http::urldetails::UrlDetails;
 use url::Url;
 use inout::{InputOutput, Input, output::handle_output};
 

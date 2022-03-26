@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use super::{Method, Scheme, UrlDetails};
+use super::{Method, Scheme, urldetails::UrlDetails};
 use super::headers::Headers;
 use serde::Serialize;
 
