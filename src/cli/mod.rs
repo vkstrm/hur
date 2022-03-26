@@ -7,6 +7,7 @@ use crate::error;
 use clap::{ArgMatches, Arg, crate_version, crate_authors, crate_name};
 
 pub mod output;
+use output::Output;
 
 pub struct Input {
     pub url: String,
@@ -16,41 +17,39 @@ pub struct Input {
     pub no_proxy: bool
 }
 
-pub struct InputOutput {
-    pub input: Input,
-    pub output: output::Output,
+pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
+    let matches = use_clap(&args);
+    let input = parse_input(&matches)?;
+    let output = parse_output(&matches);
+    if matches.is_present("info") {
+        enable_logging()?;
+    }
+
+    Ok((input, output))
 }
 
-pub fn parse_args(args: Vec<String>) -> Result<InputOutput, Error> {
-    let matches = use_clap(&args);
+fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
     let mut headers = collect_headers(matches.values_of("header"));
     let body = collect_body(
         matches.value_of("body"), 
         matches.value_of("json"), 
         &mut headers)?;
 
-    let input = Input{
+    Ok(Input{
         url: matches.value_of("url").unwrap().to_string(),
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
         no_proxy: matches.is_present("no-proxy"),
-    };
+    })
+}
 
-    if matches.is_present("info") {
-        enable_logging()?;
-    }
-
-    let output = output::Output {
+fn parse_output(matches: &ArgMatches) -> Output {
+    Output {
         verbose: matches.is_present("verbose"),
         query_header: matches.value_of("query-header").map(|q| String::from(q.trim())),
         no_body: matches.is_present("no-body"),
-    };
-
-    Ok(InputOutput{
-        input,
-        output
-    })
+    }
 }
 
 fn collect_headers(headers_option: Option<clap::Values>) -> Headers {
