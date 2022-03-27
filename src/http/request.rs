@@ -1,47 +1,63 @@
-use std::net::SocketAddr;
+use std::net::{ToSocketAddrs, SocketAddr};
 
-use super::{Method, Scheme, urldetails::UrlDetails};
+use super::{Method, Scheme};
 use super::headers::Headers;
 use serde::Serialize;
+use url::Url;
 
 use crate::error::Error;
 
 #[derive(Serialize)]
 pub struct Request {
+    #[serde(skip)]
+    pub url: Url,
+    #[serde(rename = "url")]
+    pub full_path: String,
+    pub scheme: Scheme,
     pub protocol: String,
     pub method: Method,
     path: String,
-    pub full_path: String,
     pub headers: Headers,
     body: Option<String>,
-    pub domain: Option<String>,
-    pub scheme: Scheme,
-    pub servers: Vec<SocketAddr>,
-    pub host: String,
 }
 
 impl Request {
-    pub fn new(method: Method, url_details: UrlDetails, headers: Headers) -> Result<Request, Error> {
-        let servers = url_details.find_socket_addresses()?;
-
+    pub fn new(url: Url, method: Method, headers: Headers) -> Result<Request, Error> {
         Ok(Request{
+            full_path: url.to_string(),
+            scheme: Scheme::from(url.scheme()),
             protocol: String::from("HTTP/1.1"),
             method,
-            path: url_details.path,
-            full_path: url_details.full_path,
-            headers,
+            path: String::from(url.path()),
+            headers: standard_headers(headers, &url.host().unwrap().to_string()), // TODO Gör bättre 
             body: None,
-            domain: url_details.domain,
-            scheme: url_details.scheme,
-            servers,
-            host: url_details.host,
+            url,
         })
     }
 
-    pub fn with_body(method: Method, url: UrlDetails, headers: Headers, body: &str) -> Result<Request, Error> {
-        let mut request = Request::new(method, url, headers)?;
+    pub fn with_body(url: Url, method: Method, headers: Headers, body: &str) -> Result<Request, Error> {
+        let mut request = Request::new(url, method, headers)?;
         request.body = Some(body.to_string());
         Ok(request)
+    }
+
+    pub fn find_socket_addresses(&self) -> Result<Vec<SocketAddr>, Error> {
+        let mut server_details = String::new();
+        match &self.url.domain() {
+            Some(domain) => server_details.push_str(domain),
+            None => server_details.push_str(&self.url.host().unwrap().to_string()), 
+        };
+        server_details.push(':');
+        match self.url.port() {
+            Some(port) => server_details.push_str(&port.to_string()),
+            None => {
+                match self.scheme {
+                    Scheme::HTTPS => server_details.push_str("443"),
+                    Scheme::HTTP => server_details.push_str("80")
+                }
+            }
+        }
+        Ok(server_details.to_socket_addrs()?.collect())
     }
 
     fn build_request(&self, path: &str) -> String {
@@ -83,4 +99,13 @@ impl Request {
     pub fn build_http_proxy(&self) -> String {
         self.build_request(&self.full_path)
     }
+}
+
+fn standard_headers(input_headers: Headers, host: &str) -> Headers {
+    let mut hs = Headers::new();
+    hs.add("User-Agent", &format!("{}/{}", clap::crate_name!(), clap::crate_version!()));
+    hs.add("Host", host);
+    hs.add("Connection", "close");
+    hs.append(input_headers);
+    hs
 }

@@ -8,12 +8,13 @@ use crate::error;
 pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
     if let Some(no_proxy) = get_env("NO_PROXY") {
         let no_proxy_splits: Vec<&str> = no_proxy.split(',').collect();
+        let servers = request.find_socket_addresses()?;
         for no_proxy_entry in no_proxy_splits {
-            if request.host == no_proxy_entry  {
+            if request.url.host().unwrap().to_string() == no_proxy_entry  {
                 return Ok(None)
             }
 
-            if is_ip_address(no_proxy_entry) && no_proxy_server(&request.servers, no_proxy_entry) {
+            if is_ip_address(no_proxy_entry) && no_proxy_server(&servers, no_proxy_entry) {
                 return Ok(None)
             }
         }

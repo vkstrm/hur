@@ -25,12 +25,14 @@ pub fn send_request(request: Request) -> Result<Response, Error> {
 
 fn http(request: Request) -> Result<Response, Error> {
     let request_str = request.build();
-    internal_http(connector::http_request, request.servers, &request_str)
+    let servers = request.find_socket_addresses()?;
+    internal_http(connector::http_request, servers, &request_str)
 }
 
 fn https(request: Request) -> Result<Response, Error> {
     let request_str = request.build();
-    internal_https(connector::https_request, request.servers, &request_str, &request.domain.unwrap())
+    let servers = request.find_socket_addresses()?;
+    internal_https(connector::https_request, servers, &request_str, &request.url.domain().unwrap())
 }
 
 fn proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
@@ -40,7 +42,7 @@ fn proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Er
 
 fn proxy_https(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
     let request_str = request.build();
-    internal_https(connector::proxy_https_request, servers, &request_str, &request.domain.unwrap())
+    internal_https(connector::proxy_https_request, servers, &request_str, &request.url.domain().unwrap())
 }
 
 fn internal_https(func: HttpsFunc, servers: Vec<SocketAddr>, request: &str, domain: &str) -> Result<Response, Error> {

@@ -1,7 +1,6 @@
 pub mod response;
 pub mod request;
 pub mod headers;
-pub mod urldetails;
 
 #[derive(serde::Serialize, Debug)]
 pub enum Method {
@@ -26,4 +25,13 @@ impl std::fmt::Display for Method {
 pub enum Scheme {
     HTTP,
     HTTPS
+}
+
+impl From<&str> for Scheme {
+    fn from(s: &str) -> Scheme {
+        match s {
+            "http" => Scheme::HTTP,
+            "https" | _ => Scheme::HTTPS,
+        }
+    }
 }
