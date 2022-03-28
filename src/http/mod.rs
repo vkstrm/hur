@@ -1,3 +1,7 @@
+use crate::error;
+use crate::error::Error;
+use std::convert::TryFrom;
+
 pub mod response;
 pub mod request;
 pub mod headers;
@@ -27,11 +31,14 @@ pub enum Scheme {
     HTTPS
 }
 
-impl From<&str> for Scheme {
-    fn from(s: &str) -> Scheme {
+impl TryFrom<&str> for Scheme {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Scheme, Self::Error> {
         match s {
-            "http" => Scheme::HTTP,
-            "https" | _ => Scheme::HTTPS,
+            "http" => Ok(Scheme::HTTP),
+            "https" => Ok(Scheme::HTTPS),
+            _ => error!("hur only supports http/s")
         }
     }
 }

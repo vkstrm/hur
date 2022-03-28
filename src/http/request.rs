@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::net::{ToSocketAddrs, SocketAddr};
 
 use super::{Method, Scheme};
@@ -25,7 +26,7 @@ impl Request {
     pub fn new(url: Url, method: Method, headers: Headers) -> Result<Request, Error> {
         Ok(Request{
             full_path: url.to_string(),
-            scheme: Scheme::from(url.scheme()),
+            scheme: Scheme::try_from(url.scheme())?,
             protocol: String::from("HTTP/1.1"),
             method,
             path: String::from(url.path()),
