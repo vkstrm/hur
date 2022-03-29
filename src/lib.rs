@@ -1,14 +1,13 @@
 mod error;
 mod http;
 mod cli;
-mod proxy;
 mod logs;
 mod requester;
 
 use cli::output::{Output, handle_output};
 use cli::Input;
 use error::Error;
-use http::{request::Request, response::Response};
+use http::request::Request;
 use url::Url;
 
 pub fn process(args: Vec<String>) {
@@ -24,27 +23,11 @@ fn handle_arguments(args: Vec<String>) -> Result<(), Error> {
 }
 
 fn handle_input(input: Input, output: Output) -> Result<(),Error> {
-    let no_proxy = input.no_proxy;
+    let allow_proxy = input.allow_proxy;
     let request = setup_request(input)?;
     let request_output = serde_json::to_value(&request)?;
-
-    let response = match no_proxy {
-        false => request_with_proxy(request)?,
-        true => no_proxy_request(request)?
-    };
-
+    let response = requester::send_request(request, allow_proxy)?;
     handle_output(response, request_output, output)
-}
-
-fn request_with_proxy(request: Request) -> Result<Response, Error> {
-    match proxy::should_proxy(&request)? {
-        Some(addrs) => requester::send_proxy_request(request, addrs),
-        None => requester::send_request(request)
-    }
-}
-
-fn no_proxy_request(request: Request) -> Result<Response, Error> {
-    requester::send_request(request)
 }
 
 fn setup_request(input: Input) -> Result<Request, Error> {

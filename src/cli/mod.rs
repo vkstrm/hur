@@ -14,7 +14,7 @@ pub struct Input {
     pub method: Method,
     pub headers: Headers,
     pub body: Option<String>,
-    pub no_proxy: bool
+    pub allow_proxy: bool
 }
 
 pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
@@ -40,7 +40,7 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
-        no_proxy: matches.is_present("no-proxy"),
+        allow_proxy: !(matches.is_present("no-proxy")),
     })
 }
 

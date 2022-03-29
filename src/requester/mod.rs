@@ -5,21 +5,31 @@ use crate::http::{request::Request, response::Response, Scheme};
 use std::net::SocketAddr;
 
 mod connector;
+mod proxy;
 
 type HttpsFunc = fn(server: SocketAddr, request: &str, domain: &str) -> Result<Vec<u8>, Error>;
 type HttpFunc = fn(server: SocketAddr, request: &str) -> Result<Vec<u8>, Error>;
 
-pub fn send_proxy_request(request: Request, addrs: Vec<SocketAddr>) -> Result<Response, Error> {
-    match request.scheme {
-        Scheme::HTTP => proxy_http(request, addrs),
-        Scheme::HTTPS => proxy_https(request, addrs)
-    }
+pub fn send_request(request: Request, allow_proxy: bool) -> Result<Response, Error> {
+    match allow_proxy {
+        true => try_for_proxy(request),
+        false => match request.scheme {
+            Scheme::HTTP => http(request),
+            Scheme::HTTPS => https(request)
+        }
+    } 
 }
 
-pub fn send_request(request: Request) -> Result<Response, Error> {
-    match request.scheme {
-        Scheme::HTTP => http(request),
-        Scheme::HTTPS => https(request)
+fn try_for_proxy(request: Request) -> Result<Response, Error> {
+    match proxy::should_proxy(&request)? {
+        Some(servers) => match request.scheme {
+            Scheme::HTTP => proxy_http(request, servers),
+            Scheme::HTTPS => proxy_https(request, servers)
+        },
+        None => match request.scheme {
+            Scheme::HTTP => http(request),
+            Scheme::HTTPS => https(request)
+        } 
     }
 }
 
