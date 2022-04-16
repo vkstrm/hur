@@ -10,7 +10,7 @@ pub struct Output {
 pub fn handle_output(mut response: Response, request: serde_json::Value, output: Output) -> Result<(), Error> {
     if output.verbose {
         if output.no_body {
-            response.body = Some(String::from("Gulp, I swallowed the body!")); 
+            response.body = None; 
         }
         let json_output = serde_json::json!({"request": request, "response":response});
         println!("{}", serde_json::to_string_pretty(&json_output)?);
@@ -18,7 +18,7 @@ pub fn handle_output(mut response: Response, request: serde_json::Value, output:
         query_header(&h, &response.headers)
     } else {
         match &response.body {
-            Some(body) => if !output.no_body { println!("{}", body) },
+            Some(body) => if !output.no_body { print!("{}", body) },
             None => {},
         }
     }

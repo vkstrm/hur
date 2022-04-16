@@ -2,6 +2,13 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::ser::SerializeMap;
 
+/**
+ * A sender MUST NOT generate multiple header fields with the same field
+   name in a message unless either the entire field value for that
+   header field is defined as a comma-separated list [i.e., #(values)]
+   or the header field is a well-known exception (as noted below).
+ */
+
 #[derive(Debug)]
 pub struct Headers {
     pub headers_map: std::collections::HashMap<String, Vec<String>>
@@ -51,6 +58,10 @@ impl Headers {
                 }
             }
         }
+    }
+
+    pub fn has(&self, header: &str) -> Option<&Vec<String>> {
+        self.headers_map.get(header)
     }
 }
 
