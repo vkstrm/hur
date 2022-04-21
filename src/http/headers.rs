@@ -11,6 +11,7 @@ use serde::ser::SerializeMap;
 
 #[derive(Debug)]
 pub struct Headers {
+    // TODO field shouldn't be public
     pub headers_map: std::collections::HashMap<String, Vec<String>>
 }
 
@@ -60,8 +61,17 @@ impl Headers {
         }
     }
 
-    pub fn has(&self, header: &str) -> Option<&Vec<String>> {
-        self.headers_map.get(header)
+    pub fn get(&self, header: &str) -> Option<&Vec<String>> {
+        match self.headers_map.get(header) {
+            Some(vec) => {
+                if !vec.is_empty() {
+                    Some(vec)
+                } else {
+                    None
+                }
+            },
+            None => None,
+        }
     }
 }
 

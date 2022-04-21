@@ -18,7 +18,7 @@ pub fn handle_output(mut response: Response, request: serde_json::Value, output:
         query_header(&h, &response.headers)
     } else {
         match &response.body {
-            Some(body) => if !output.no_body { print!("{}", body) },
+            Some(body) => if !output.no_body { println!("{}", body) },
             None => {},
         }
     }

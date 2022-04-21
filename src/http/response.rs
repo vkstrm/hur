@@ -1,5 +1,5 @@
 use std::io::BufRead;
-
+use std::convert::TryInto;
 use super::headers::Headers;
 use crate::error::Error;
 use crate::error;
@@ -23,35 +23,38 @@ impl Response {
         let (protocol, status_code, reason_phrase) = parse_status_line(&status_line)?;
         let headers = collect_headers(head)?;
 
-        // Collect body
-        // let mut body_string = String::new();
-        // for line in lines {
-        //     body_string.push_str(&format!("{line}\n",line = line));
-        // }
-        // let body = match body_string.is_empty() {
-        //     true => None,
-        //     false => Some(body_string),
-        // };
+        if (status_code >= 100 && status_code <= 199) || status_code == 204 || status_code == 304 {
+            return Ok(Response {
+                protocol,
+                status_code,
+                reason_phrase,
+                headers,
+                body: None,
+            })
+        }
 
-        // https://www.rfc-editor.org/rfc/rfc7230#section-3.3.3
-        
-
-        // let body = match headers.has("Transfer-Encoding") {
-        //     Some(header_vec) => {
-        //         match header_vec[0].as_str() {
-        //             "chunked" => collect_chunked_body(&mut lines),
-        //             _ => panic!("unsupported transfer-encoding")
-        //         }
-        //     },
-        //     None => None
-        // };
+        let body = if let Some(encoding) = headers.get("Transfer-Encoding") {
+            let encoding = encoding[0].as_str();
+            // TODO Check if header contains commas example "chunked, gzip"
+            match encoding {
+                "chunked" => {
+                    chunked_body(bottom)?
+                },
+                _ => None,
+            }
+        } else if let Some(encoding) = headers.get("Content-Length") {
+            let length = encoding[0].parse::<usize>().unwrap();
+            Some(content_length_body(length, bottom)?)
+        } else {
+            Some(String::from_utf8(bottom.to_vec()).unwrap())
+        };
 
         Ok(Response {
             protocol,
             status_code,
             reason_phrase,
             headers,
-            body: None,
+            body,
         })
     }
 }
@@ -96,10 +99,10 @@ fn collect_head(buf: &[u8]) -> &[u8] {
     while let Some(line) = iter.next() {
         match line {
             Ok(l) => {
-                taken += l.len();
                 if l.is_empty() {
                     break;
                 }
+                taken += l.len() + CRLF_LEN;
             },
             _ => {}
         }
@@ -149,82 +152,68 @@ fn test_collect_headers() {
     let head = r#"Content-Type:application/json
     Content-Length:5000"#;
     let headers = collect_headers(head.as_bytes()).unwrap();
-    assert_eq!(headers.has("Content-Type"), Some(&vec!["application/json".to_string()]))
+    assert_eq!(headers.get("Content-Type"), Some(&vec!["application/json".to_string()]))
 }
 
-// fn collect_chunked_body(lines: &mut Lines) -> Option<String> {
-//     // let chunk_size = match lines.next() {
-//     //     Some(size) => {
-//     //         hexstr_to_dec(size)
-//     //     },
-//     //     None => return None,
-//     // };
+fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
+    let mut lines = buf.iter().as_slice().lines();
+    lines.next(); // Advance past empty line
+    let (chunk_size, chunk_line_size) = if let Some(line_res) = lines.next() {
+        match line_res {
+            Ok(line) => {
+                (hexstr_to_dec(&line), line.as_bytes().len() + CRLF_LEN)
+            },
+            Err(why) => error!(&why.to_string())
+        }
+    } else {
+        (0, 0)
+    };
 
-//     let mut body: Vec<String> = Vec::new();
-//     let mut previous_empty = false;
-//     while let Some(line) = lines.next() {
-//         if line.is_empty() { previous_empty = true; }
-//         if line == "0" && previous_empty { 
-//             break; 
-//         }
-//         body.push(format!("{l}\n", l = line));
-//     }
-//     if body.is_empty() { return None; }
-//     match body.last() {
-//         Some(line) => {
-//             if line == "\n" {
-//                 body.pop();
-//             }
-//         },
-//         None => unreachable!()
-//     };
-//     Some(String::from_iter(body.into_iter()))
-// }
+    if &chunk_size < &buf[CRLF_LEN + chunk_line_size..].len() {
+        // Why does times 3 work?
+        return Ok(Some(String::from_utf8(buf[CRLF_LEN + chunk_line_size..(CRLF_LEN * 3) + chunk_size].to_vec()).unwrap()))
+    }
 
-// fn hexstr_to_dec(s: &str) -> usize {
-//     let mut sum = 0;
-//     let mut n: u32 = s.len().try_into().unwrap();
-//     for x in s.to_lowercase().chars() {
-//         if n != 0 {
-//             n -= 1;
-//         }
-//         let with_n = u32::pow(16, n);
-//         if let Some(digit) = x.to_digit(10) {
-//             sum += digit * with_n;
-//         } else {
-//             sum += match x {
-//                 'a' => 10 * with_n,
-//                 'b' => 11 * with_n,
-//                 'c' => 12 * with_n,
-//                 'd' => 13 * with_n,
-//                 'e' => 14 * with_n,
-//                 'f' => 15 * with_n,
-//                 _ => 0, 
-//             };
-//         }
-//     }
-//     sum as usize
-// }
+    Ok(None)
+}
 
-// #[test]
-// fn hex_test() {
-//     assert_eq!(hexstr_to_dec("3B"), 59);
-//     assert_eq!(hexstr_to_dec("E7A9"), 59305);
-// }
+fn content_length_body(content_length: usize, buf: &[u8]) -> Result<String, Error> {
+    let mut lines = buf.iter().as_slice().lines();
+    lines.next();
+    let body_vec = buf[CRLF_LEN..content_length  + CRLF_LEN].to_vec();
+    match String::from_utf8(body_vec) {
+        Ok(body) => Ok(body),
+        Err(why) => error!(&why.to_string()) 
+    }
+}
 
-// fn collect_body(lines: &mut Lines) -> Option<String> {
-//     let mut body_string = String::new();
-//     while let Some(line) = lines.next() {
-//         body_string.push_str(&format!("{line}\n",line = line));
-//     }
+fn hexstr_to_dec(s: &str) -> usize {
+    let mut sum = 0;
+    let mut n: u32 = s.len().try_into().unwrap();
+    for x in s.to_lowercase().chars() {
+        if n != 0 {
+            n -= 1;
+        }
+        let with_n = u32::pow(16, n);
+        if let Some(digit) = x.to_digit(10) {
+            sum += digit * with_n;
+        } else {
+            sum += match x {
+                'a' => 10 * with_n,
+                'b' => 11 * with_n,
+                'c' => 12 * with_n,
+                'd' => 13 * with_n,
+                'e' => 14 * with_n,
+                'f' => 15 * with_n,
+                _ => 0, 
+            };
+        }
+    }
+    sum as usize
+}
 
-//     // let body_string = lines.collect::<String>();
-
-//     // for line in lines {
-//     //     body_string.push_str(&format!("{line}\n",line = line));
-//     // }
-//     match body_string.is_empty() {
-//         true => None,
-//         false => Some(body_string),
-//     }
-// }
+#[test]
+fn hex_test() {
+    assert_eq!(hexstr_to_dec("3B"), 59);
+    assert_eq!(hexstr_to_dec("E7A9"), 59305);
+}
