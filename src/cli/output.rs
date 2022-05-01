@@ -15,7 +15,7 @@ pub fn handle_output(mut response: Response, request: serde_json::Value, output:
         let json_output = serde_json::json!({"request": request, "response":response});
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else if let Some(h) = output.query_header {
-        query_header(&h, &response.headers)
+        query_header(&h, response.headers)
     } else {
         match &response.body {
             Some(body) => if !output.no_body { println!("{}", body) },
@@ -25,9 +25,9 @@ pub fn handle_output(mut response: Response, request: serde_json::Value, output:
     Ok(())
 }
 
-fn query_header(header: &str, headers: &Headers) {
+fn query_header(header: &str, headers: Headers) {
     let h = header.to_lowercase();
-    for (key, value) in &headers.headers_map {
+    for (key, value) in headers {
         if h == key.to_lowercase() {
             for val in value {
                 println!("{}", val);

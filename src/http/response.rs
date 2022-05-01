@@ -84,14 +84,6 @@ fn parse_status_line(status_line: &str) -> Result<(String, u32, String), Error> 
     Ok((protocol, status_code, reason_phrase))
 }
 
-#[test]
-fn test_parse_status_line() {
-    let status_line = "HTTP/1.1 400 Bad Request";
-    let (protocol, status_code, reason_phrase) = parse_status_line(status_line).unwrap();
-    assert_eq!(protocol, "HTTP/1.1");
-    assert_eq!(status_code, 400);
-    assert_eq!(reason_phrase, "Bad Request");
-}
 
 fn collect_head(buf: &[u8]) -> &[u8] {
     let mut taken = 0;
@@ -115,20 +107,6 @@ fn collect_body(from_index: usize, buffer: &[u8]) -> &[u8] {
     &buffer[from_index..]
 }
 
-#[test]
-fn test_collect_top() {
-    let input = "LINE 1\r\nLINE 2\r\n\r\nLINE 3\r\n\r\n";
-    let b = collect_head(input.as_bytes());
-    println!("{}", String::from_utf8(b.to_vec()).unwrap());
-}
-
-#[test]
-fn test_empty_collect_top() {
-    let input = "";
-    let b = collect_head(input.as_bytes());
-    assert_eq!(b.len(), 0);
-}
-
 fn collect_headers(head: &[u8]) -> Result<Headers, Error> {
     let mut headers = Headers::new();
     let mut lines = head.iter().as_slice().lines();
@@ -145,14 +123,6 @@ fn collect_headers(head: &[u8]) -> Result<Headers, Error> {
         }
     }
     Ok(headers)
-}
-
-#[test]
-fn test_collect_headers() {
-    let head = r#"Content-Type:application/json
-    Content-Length:5000"#;
-    let headers = collect_headers(head.as_bytes()).unwrap();
-    assert_eq!(headers.get("Content-Type"), Some(&vec!["application/json".to_string()]))
 }
 
 fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
@@ -216,4 +186,36 @@ fn hexstr_to_dec(s: &str) -> usize {
 fn hex_test() {
     assert_eq!(hexstr_to_dec("3B"), 59);
     assert_eq!(hexstr_to_dec("E7A9"), 59305);
+}
+
+#[test]
+fn test_parse_status_line() {
+    let status_line = "HTTP/1.1 400 Bad Request";
+    let (protocol, status_code, reason_phrase) = parse_status_line(status_line).unwrap();
+    assert_eq!(protocol, "HTTP/1.1");
+    assert_eq!(status_code, 400);
+    assert_eq!(reason_phrase, "Bad Request");
+}
+
+
+#[test]
+fn test_collect_headers() {
+    let head = r#"Content-Type:application/json
+    Content-Length:5000"#;
+    let headers = collect_headers(head.as_bytes()).unwrap();
+    assert_eq!(headers.get("Content-Type"), Some(&vec!["application/json".to_string()]))
+}
+
+#[test]
+fn test_collect_top() {
+    let input = "LINE 1\r\nLINE 2\r\n\r\nLINE 3\r\n\r\n";
+    let b = collect_head(input.as_bytes());
+    println!("{}", String::from_utf8(b.to_vec()).unwrap());
+}
+
+#[test]
+fn test_empty_collect_top() {
+    let input = "";
+    let b = collect_head(input.as_bytes());
+    assert_eq!(b.len(), 0);
 }

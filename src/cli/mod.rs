@@ -204,5 +204,5 @@ fn test_collect_json_body() {
     let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
     assert!(body.is_some());
     assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
-    assert!(headers.headers_map.contains_key("Content-Type"));
+    assert!(headers.get("Content-Type").is_some());
 }

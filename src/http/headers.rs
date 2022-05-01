@@ -81,6 +81,15 @@ impl Display for Headers {
     }
 }
 
+impl std::iter::IntoIterator for Headers {
+    type Item = (String, Vec<String>);
+    type IntoIter = std::collections::hash_map::IntoIter<String, Vec<String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.headers_map.into_iter()
+    }
+}
+
 fn capitalize(string: &str) -> String {
     let mut chars = string.chars();
     return chars.next().unwrap().to_uppercase().collect::<String>() + chars.as_str();
