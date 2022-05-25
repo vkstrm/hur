@@ -2,13 +2,6 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::ser::SerializeMap;
 
-/**
- * A sender MUST NOT generate multiple header fields with the same field
-   name in a message unless either the entire field value for that
-   header field is defined as a comma-separated list [i.e., #(values)]
-   or the header field is a well-known exception (as noted below).
- */
-
 #[derive(Debug)]
 pub struct Headers {
     // TODO field shouldn't be public

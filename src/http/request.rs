@@ -30,7 +30,7 @@ impl Request {
             protocol: String::from("HTTP/1.1"),
             method,
             path: String::from(url.path()),
-            headers: standard_headers(headers, &url.host().unwrap().to_string()), // TODO Gör bättre 
+            headers: standard_headers(headers, &url.host().unwrap().to_string()),
             body: None,
             url,
         })
@@ -62,14 +62,38 @@ impl Request {
     }
 
     fn build_request(&self, path: &str) -> String {
-        let mut message = format!(
+        let mut message = self.make_status_line(path);
+        self.add_headers(&mut message);
+        self.add_body(&mut message);
+        message.push_str("\r\n\r\n");        
+        message
+    }
+
+    pub fn build(&self) -> String {
+        self.build_request(&self.path)
+    }
+
+    pub fn build_http_proxy(&self) -> String {
+        self.build_request(&self.full_path)
+    }
+
+    fn make_status_line(&self, path: &str) -> String {
+        format!(
             "{method} {path} {protocol}\r\n",
             method = self.method.to_string(),
             path = path,
             protocol = self.protocol,
-        );
+        )
+    }
 
-        // Add headers
+    fn add_body(&self, message: &mut String) {
+        if let Some(body) = &self.body {
+            message.push_str("\r\n");
+            message.push_str(body);
+        }   
+    }
+
+    fn add_headers(&self, message: &mut String) {
         for (key, value_vec) in &self.headers.headers_map {
             for val in value_vec {
                 message.push_str(
@@ -81,24 +105,6 @@ impl Request {
                 );
             }
         }
-
-        // Add body
-        if let Some(body) = &self.body {
-            message.push_str("\r\n");
-            message.push_str(body);
-        }
-
-        // Done
-        message.push_str("\r\n\r\n");        
-        message
-    }
-
-    pub fn build(&self) -> String {
-        self.build_request(&self.path)
-    }
-
-    pub fn build_http_proxy(&self) -> String {
-        self.build_request(&self.full_path)
     }
 }
 
