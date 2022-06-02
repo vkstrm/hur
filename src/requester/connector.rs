@@ -25,19 +25,29 @@ pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Resul
 }
 
 pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
+    let mut stream = TcpStream::connect(proxy_addr)?;
+    connect_proxy(&mut stream, domain, proxy_addr)?;
+    tls_request(stream, domain, request_str.as_bytes())
+}
+
+fn connect_proxy(stream: &mut TcpStream, domain: &str, proxy_addr: SocketAddr) -> Result<(), Error> {
     log::info!("Performing CONNECT request to proxy {}", proxy_addr.to_string());
     let mut connect_buffer: [u8; 39] = [0; 39];
-    let mut stream = TcpStream::connect(proxy_addr)?;
-    let connect_message = format!("CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n", domain); 
-
-    stream.write_all(connect_message.as_bytes())?;
+    stream.write_all(connect_message(domain).as_bytes())?;
     stream.read_exact(&mut connect_buffer)?;
-    if !connect_buffer.starts_with(b"HTTP/1.1 200") && !connect_buffer.ends_with(b"\r\n\r\n") {
+    if !connect_successful(&connect_buffer) {
         error!("connect request failed");
     }
     log::info!("CONNECT request to proxy was successful");
+    Ok(())
+}
 
-    tls_request(stream, domain, request_str.as_bytes())
+fn connect_successful(buf: &[u8]) -> bool {
+    buf.starts_with(b"HTTP/1.1 200") && !buf.ends_with(b"\r\n\r\n")
+}
+
+fn connect_message(domain: &str) -> String {
+    format!("CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n", domain)
 }
 
 fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Vec<u8>, Error> {
