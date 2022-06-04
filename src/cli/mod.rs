@@ -192,7 +192,6 @@ fn test_collect_body() {
     let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
     assert!(body.is_some());
     assert_eq!(body.unwrap(), "form1:value2");
-    assert!(headers.headers_map.is_empty());
 }
 
 #[test]

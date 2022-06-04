@@ -94,7 +94,7 @@ impl Request {
     }
 
     fn add_headers(&self, message: &mut String) {
-        for (key, value_vec) in &self.headers.headers_map {
+        for (key, value_vec) in self.headers.iter() {
             for val in value_vec {
                 message.push_str(
                     &format!(

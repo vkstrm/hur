@@ -1,19 +1,19 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::{HashMap, hash_map};
+use std::fmt::Display;
 
 use serde::ser::SerializeMap;
 
 #[derive(Debug)]
 pub struct Headers {
-    // TODO field shouldn't be public
-    pub headers_map: std::collections::HashMap<String, Vec<String>>
+    internal_headers: HashMap<String, Vec<String>>
 }
 
 impl serde::Serialize for Headers {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
             S: serde::Serializer {
-        let mut map = serializer.serialize_map(Some(self.headers_map.len()))?;
-        for (k, v) in &self.headers_map {
+        let mut map = serializer.serialize_map(Some(self.internal_headers.len()))?;
+        for (k, v) in &self.internal_headers {
             map.serialize_entry(&k, &v)?;
         }
         map.end()
@@ -23,27 +23,27 @@ impl serde::Serialize for Headers {
 impl Headers {
     pub fn new() -> Headers {
         Headers {
-            headers_map: HashMap::<String, Vec<String>>::new()
+            internal_headers: HashMap::<String, Vec<String>>::new()
         }
     }
 
     pub fn add(&mut self, key: &str, value: &str) {
-        if self.headers_map.contains_key(key) {
-            match self.headers_map.get_mut(key) {
+        if self.internal_headers.contains_key(key) {
+            match self.internal_headers.get_mut(key) {
                 Some(vec) => vec.push(value.to_string()),
                 None => panic!("no vec for key"),
             }
         } else {
-            self.headers_map.insert(key.to_string(), vec![value.to_string()]);
+            self.internal_headers.insert(key.to_string(), vec![value.to_string()]);
         }
     }
 
     pub fn append(&mut self, other: Headers) {
-        for (key, val) in other.headers_map {
+        for (key, val) in other.internal_headers {
             let key = capitalize(&key);
             match key.as_str() {
                 "Connection" | "Host" => {
-                    self.headers_map.insert(key, val);
+                    self.internal_headers.insert(key, val);
                 },
                 _ => {
                     for v in val {
@@ -55,7 +55,7 @@ impl Headers {
     }
 
     pub fn get(&self, header: &str) -> Option<&Vec<String>> {
-        match self.headers_map.get(header) {
+        match self.internal_headers.get(header) {
             Some(vec) => {
                 if !vec.is_empty() {
                     Some(vec)
@@ -66,20 +66,39 @@ impl Headers {
             None => None,
         }
     }
+
+    pub fn iter(&self) -> HeaderIterator {
+        HeaderIterator{
+            iterator: self.internal_headers.iter()
+        }
+    }
 }
 
 impl Display for Headers {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self.headers_map)
+        write!(f, "{:?}", self.internal_headers)
+    }
+}
+
+
+pub struct HeaderIterator<'a> {
+    iterator: hash_map::Iter<'a, String, Vec<String>>
+}
+
+impl<'a> Iterator for HeaderIterator<'a> {
+    type Item = (&'a String, &'a Vec<String>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iterator.next()
     }
 }
 
 impl std::iter::IntoIterator for Headers {
     type Item = (String, Vec<String>);
-    type IntoIter = std::collections::hash_map::IntoIter<String, Vec<String>>;
+    type IntoIter = hash_map::IntoIter<String, Vec<String>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.headers_map.into_iter()
+        self.internal_headers.into_iter()
     }
 }
 
