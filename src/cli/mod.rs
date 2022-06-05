@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use super::http::{Method, headers::Headers};
 use super::logs;
 
@@ -29,7 +31,7 @@ pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
 }
 
 fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
-    let mut headers = collect_headers(matches.values_of("header"));
+    let mut headers = headers(&matches)?;
     let body = collect_body(
         matches.value_of("body"), 
         matches.value_of("json"), 
@@ -52,7 +54,16 @@ fn parse_output(matches: &ArgMatches) -> Output {
     }
 }
 
-fn collect_headers(headers_option: Option<clap::Values>) -> Headers {
+fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
+    let mut headers = single_headers(matches.values_of("header"));
+    match json_headers(matches.value_of("headers"))? {
+        Some(h) => headers.append(h),
+        None => {}
+    }
+    Ok(headers)
+}
+
+fn single_headers(headers_option: Option<clap::Values>) -> Headers {
     match headers_option {
         Some(values) => {
             let mut headers = Headers::new();
@@ -64,6 +75,27 @@ fn collect_headers(headers_option: Option<clap::Values>) -> Headers {
         },
         None => Headers::new()
     }
+}
+
+fn json_headers(headers_json: Option<&str>) -> Result<Option<Headers>, Error> {
+    match headers_json {
+        Some(value) => {
+            let json_string = match value.ends_with(".json") {
+                true => read_file(value)?,
+                false => value.to_string()
+            };
+            let map: std::collections::HashMap<String, String> = serde_json::from_str(&json_string)?;
+            Ok(Some(Headers::from(map)))
+        },
+        None => return Ok(None),
+    }
+}
+
+fn read_file(path: &str) -> Result<String, Error> {
+    let mut file = std::fs::File::open(path)?;
+    let mut buf = String::new();
+    file.read_to_string(&mut buf)?;
+    Ok(buf)
 }
 
 fn collect_body(body_option: Option<&str>, json_option: Option<&str>, headers: &mut Headers) -> Result<Option<String>, Error> {
@@ -149,6 +181,12 @@ fn use_clap(args: &[String]) -> ArgMatches {
                 .short('h')
                 .long("header")
                 .multiple_occurrences(true)
+        )
+        .arg(
+            Arg::new("headers")
+                .help("Headers as a json string or file ending with .json")
+                .takes_value(true)
+                .long("headers")
         )
         .arg(
             Arg::new("body")

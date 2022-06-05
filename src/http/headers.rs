@@ -80,6 +80,16 @@ impl Display for Headers {
     }
 }
 
+impl From<HashMap<String, String>> for Headers {
+    fn from(map: HashMap<String, String>) -> Self {
+        let mut headers = Headers::new();
+        for (key, value) in map {
+            headers.add(&key, &value)
+        }
+        headers
+    }
+}
+
 
 pub struct HeaderIterator<'a> {
     iterator: hash_map::Iter<'a, String, Vec<String>>
