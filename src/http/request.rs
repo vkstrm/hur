@@ -19,7 +19,10 @@ pub struct Request {
     pub method: Method,
     path: String,
     pub headers: Headers,
+    #[serde(skip_serializing_if = "Option::is_none")]
     body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    query: Option<String>
 }
 
 impl Request {
@@ -32,6 +35,7 @@ impl Request {
             path: String::from(url.path()),
             headers: standard_headers(headers, &url.host().unwrap().to_string()),
             body: None,
+            query: url.query().map_or_else(|| None, |s| Some(String::from(s))),
             url,
         })
     }
@@ -78,6 +82,10 @@ impl Request {
     }
 
     fn make_status_line(&self, path: &str) -> String {
+        let path = match &self.query {
+            Some(query) => format!("{path}?{query}"),
+            None => path.to_string()
+        };
         format!(
             "{method} {path} {protocol}\r\n",
             method = self.method.to_string(),
