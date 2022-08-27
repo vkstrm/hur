@@ -86,3 +86,51 @@ fn internal_http(func: HttpFunc, servers: Vec<SocketAddr>, request: &str) -> Res
 
     error!("no server worked for request")
 }
+
+
+#[cfg(test)]
+mod tests {
+    use httptest::{Server, Expectation, matchers::*, responders::*};
+    use url::Url;
+    use super::*;
+    use crate::http::{Method, headers::Headers};
+    use serde_json;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    struct TestType {
+        name: String,
+        age: u32,
+    }
+
+    #[test]
+    fn get_request_ok() {
+        // Arrange
+        let server = get_json_server();
+        let uri = server.url("/foo");
+
+        let url = Url::parse(&uri.to_string()).unwrap();
+        let request = Request::new(url, Method::GET, Headers::new()).unwrap();
+
+        // Act
+        let response = send_request(request, false).unwrap();
+
+        // Assert
+        assert_eq!(response.status_code, 200);
+        assert_eq!(response.headers.get("content-type").unwrap().first().unwrap(), "application/json");
+        let body: TestType = serde_json::from_str(&response.body.unwrap()).unwrap();
+        assert_eq!(body.name, "Bob");
+        assert_eq!(body.age, 25);
+    }
+
+    fn get_json_server() -> Server {
+        let server = Server::run();
+        let responder = status_code(200)
+            .body(r#"{"name":"Bob", "age":25}"#)
+            .append_header("Content-Type", "application/json");
+
+        let expectation = Expectation::matching(request::method_path("GET", "/foo"));
+        server.expect(expectation.respond_with(responder));
+        server
+    }
+}
