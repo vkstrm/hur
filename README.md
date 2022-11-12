@@ -14,3 +14,7 @@ Written to learn more about Rust and HTTP.
 ## Proxy
 
 Proxy support with HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables. Disable proxy for request using `--no-proxy`
+
+## Dependencies
+
+On Linux, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
