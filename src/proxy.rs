@@ -1,16 +1,16 @@
-use std::net::ToSocketAddrs;
+use std::net::{ToSocketAddrs, SocketAddr};
 use regex::Regex;
+use url::Url;
 
-use crate::http;
+use crate::http::{self, Scheme};
 use crate::error::Error;
 use crate::error;
 
-pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
+pub fn should_proxy(url: &Url, servers: &Vec<SocketAddr>, scheme: &Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Error> {
     if let Some(no_proxy) = get_env("NO_PROXY") {
         let no_proxy_splits: Vec<&str> = no_proxy.split(',').collect();
-        let servers = request.find_socket_addresses()?;
         for no_proxy_entry in no_proxy_splits {
-            if request.url.host().unwrap().to_string() == no_proxy_entry  {
+            if url.host().unwrap().to_string() == no_proxy_entry  {
                 return Ok(None)
             }
 
@@ -20,7 +20,7 @@ pub fn should_proxy(request: &http::request::Request) -> Result<Option<Vec<std::
         }
     }
 
-    proxy(&request.scheme)
+    proxy(&scheme)
 }
 
 fn no_proxy_server(servers: &[std::net::SocketAddr], no_proxy: &str) -> bool {
@@ -51,6 +51,7 @@ fn proxy(scheme: &http::Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Err
         }
     }
     if let Some(proxy) = get_env(&proxy_key) {
+        log::info!("Found proxy address {}", proxy);
         return Ok(Some(proxy_address(&proxy)?))
     }
 

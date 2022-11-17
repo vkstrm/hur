@@ -7,11 +7,16 @@ use serde::Serialize;
 use url::Url;
 
 use crate::error::Error;
+use crate::proxy::should_proxy;
 
 #[derive(Serialize)]
 pub struct Request {
     #[serde(skip)]
     pub url: Url,
+    #[serde(skip)]
+    pub proxy: bool,
+    #[serde(skip)]
+    pub servers: Vec<SocketAddr>,
     #[serde(rename = "url")]
     pub full_path: String,
     pub scheme: Scheme,
@@ -27,9 +32,18 @@ pub struct Request {
 
 impl Request {
     pub fn new(url: Url, method: Method, headers: Headers) -> Result<Request, Error> {
+        let scheme = Scheme::try_from(url.scheme())?;
+        let url_servers = find_socket_addresses(&url, &scheme)?;
+        let (servers, proxy) = match should_proxy(&url, &url_servers, &scheme)? {
+            Some(servers) => (servers, true),
+            None => (url_servers, false)
+        };
+
         Ok(Request{
+            proxy,
+            servers,
             full_path: url.to_string(),
-            scheme: Scheme::try_from(url.scheme())?,
+            scheme,
             protocol: String::from("HTTP/1.1"),
             method,
             path: String::from(url.path()),
@@ -46,25 +60,6 @@ impl Request {
         Ok(request)
     }
 
-    pub fn find_socket_addresses(&self) -> Result<Vec<SocketAddr>, Error> {
-        let mut server_details = String::new();
-        match &self.url.domain() {
-            Some(domain) => server_details.push_str(domain),
-            None => server_details.push_str(&self.url.host().unwrap().to_string()), 
-        };
-        server_details.push(':');
-        match self.url.port() {
-            Some(port) => server_details.push_str(&port.to_string()),
-            None => {
-                match self.scheme {
-                    Scheme::HTTPS => server_details.push_str("443"),
-                    Scheme::HTTP => server_details.push_str("80")
-                }
-            }
-        }
-        Ok(server_details.to_socket_addrs()?.collect())
-    }
-
     fn build_request(&self, path: &str) -> String {
         let mut message = self.make_status_line(path);
         self.add_headers(&mut message);
@@ -74,11 +69,11 @@ impl Request {
     }
 
     pub fn build(&self) -> String {
-        self.build_request(&self.path)
-    }
-
-    pub fn build_http_proxy(&self) -> String {
-        self.build_request(&self.full_path)
+        let path = match (self.proxy, &self.scheme) {
+            (true, Scheme::HTTP) => &self.full_path,
+            _ => &self.path
+        };
+        self.build_request(path)
     }
 
     fn make_status_line(&self, path: &str) -> String {
@@ -114,6 +109,25 @@ impl Request {
             }
         }
     }
+}
+
+fn find_socket_addresses(url: &Url, scheme: &Scheme) -> Result<Vec<SocketAddr>, Error> {
+    let mut server_details = String::new();
+    match url.domain() {
+        Some(domain) => server_details.push_str(domain),
+        None => server_details.push_str(&url.host().unwrap().to_string()), 
+    };
+    server_details.push(':');
+    match url.port() {
+        Some(port) => server_details.push_str(&port.to_string()),
+        None => {
+            match scheme {
+                Scheme::HTTPS => server_details.push_str("443"),
+                Scheme::HTTP => server_details.push_str("80")
+            }
+        }
+    }
+    Ok(server_details.to_socket_addrs()?.collect())
 }
 
 fn standard_headers(input_headers: Headers, host: &str) -> Headers {

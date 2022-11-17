@@ -17,6 +17,7 @@ pub struct Input {
     pub headers: Headers,
     pub body: Option<String>,
     pub allow_proxy: bool,
+    pub timeout: u64
 }
 
 pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
@@ -38,12 +39,18 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
         &mut headers,
     )?;
 
+    let timeout = match matches.value_of("timeout") {
+        Some(timeout) => timeout.parse::<u64>().unwrap(), // TODO Solve better 
+        None => 10,
+    };
+
     Ok(Input {
         url: matches.value_of("url").unwrap().to_string(),
         method: get_method(matches.value_of("method").unwrap()),
         headers,
         body,
         allow_proxy: !(matches.is_present("no-proxy")),
+        timeout
     })
 }
 
@@ -199,6 +206,12 @@ fn use_clap(args: &[String]) -> ArgMatches {
             Arg::new("no-proxy")
                 .help("Do not proxy request")
                 .long("no-proxy"),
+        )
+        .arg(
+            Arg::new("timeout")
+                .help("The read timeout in seconds for the request")
+                .long("timeout")
+                .takes_value(true)
         )
         .get_matches_from(args);
 }

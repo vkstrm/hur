@@ -2,89 +2,41 @@ use crate::error::Error;
 use crate::error;
 use crate::http::{request::Request, response::Response, Scheme};
 
-use std::net::SocketAddr;
+pub mod connector;
 
-mod connector;
-mod proxy;
+use connector::Connector;
 
-type HttpsFunc = fn(server: SocketAddr, request: &str, domain: &str) -> Result<Vec<u8>, Error>;
-type HttpFunc = fn(server: SocketAddr, request: &str) -> Result<Vec<u8>, Error>;
+pub struct Requester {
+    connector: Box<dyn Connector>
+}
 
-pub fn send_request(request: Request, allow_proxy: bool) -> Result<Response, Error> {
-    match allow_proxy {
-        true => try_for_proxy(request),
-        false => match request.scheme {
-            Scheme::HTTP => http(request),
-            Scheme::HTTPS => https(request)
+impl Requester {
+    pub fn new(connector: Box<dyn Connector>) -> Self {
+        Requester {
+            connector
         }
-    } 
-}
-
-fn try_for_proxy(request: Request) -> Result<Response, Error> {
-    match proxy::should_proxy(&request)? {
-        Some(servers) => match request.scheme {
-            Scheme::HTTP => proxy_http(request, servers),
-            Scheme::HTTPS => proxy_https(request, servers)
-        },
-        None => match request.scheme {
-            Scheme::HTTP => http(request),
-            Scheme::HTTPS => https(request)
-        } 
     }
-}
 
-fn http(request: Request) -> Result<Response, Error> {
-    let request_str = request.build();
-    let servers = request.find_socket_addresses()?;
-    internal_http(connector::http_request, servers, &request_str)
-}
-
-fn https(request: Request) -> Result<Response, Error> {
-    let request_str = request.build();
-    let servers = request.find_socket_addresses()?;
-    internal_https(connector::https_request, servers, &request_str, &request.url.domain().unwrap())
-}
-
-fn proxy_http(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
-    let request_str = request.build_http_proxy();
-    internal_http(connector::http_request, servers, &request_str)
-}
-
-fn proxy_https(request: Request, servers: Vec<SocketAddr>) -> Result<Response, Error> {
-    let request_str = request.build();
-    internal_https(connector::proxy_https_request, servers, &request_str, &request.url.domain().unwrap())
-}
-
-fn internal_https(func: HttpsFunc, servers: Vec<SocketAddr>, request: &str, domain: &str) -> Result<Response, Error> {
-    for server in servers {
-        let server_str = server.to_string();
-        log::info!("Trying server {}", server_str);
-        match func(server, domain, request) {
-            Ok(response) => return Response::from_buffer(&response),
-            Err(err) => {
-                log::warn!("Request to {} failed with error {}", server_str, err);
-                continue;
+    pub fn send_request(&self, request: Request) -> Result<Response, Error> {
+        let request_str = request.build();
+        for server in request.servers {
+            let server_str = server.to_string();
+            log::info!("Trying server {}", server_str);
+            let result = match request.scheme {
+                Scheme::HTTP => self.connector.http_request(server, &request_str),
+                Scheme::HTTPS => self.connector.https_request(server, request.url.domain().unwrap(), &request_str)
+            };
+            match result {
+                Ok(response) => return Response::from_buffer(&response),
+                Err(err) => {
+                    log::warn!("Request to {} failed with error {}", server_str, err);
+                    continue;
+                }
             }
         }
+    
+        error!("no server worked for request")
     }
-
-    error!("no server worked for request")
-}
-
-fn internal_http(func: HttpFunc, servers: Vec<SocketAddr>, request: &str) -> Result<Response, Error> {
-    for server in servers {
-        let server_str = server.to_string();
-        log::info!("Trying server {}", server_str);
-        match func(server, request) {
-            Ok(response) => return Response::from_buffer(&response),
-            Err(err) => {
-                log::warn!("Request to {} failed with error {}", server_str, err);
-                continue;
-            }
-        }
-    }
-
-    error!("no server worked for request")
 }
 
 
@@ -93,7 +45,7 @@ mod tests {
     use httptest::{Server, Expectation, matchers::*, responders::*};
     use url::Url;
     use super::*;
-    use crate::http::{Method, headers::Headers};
+    use crate::{http::{Method, headers::Headers}, requester::connector::RegularConnector};
     use serde_json;
     use serde::{Deserialize, Serialize};
 
@@ -112,8 +64,10 @@ mod tests {
         let url = Url::parse(&uri.to_string()).unwrap();
         let request = Request::new(url, Method::GET, Headers::new()).unwrap();
 
+        let requester = Requester::new(Box::new(RegularConnector::new(10)));
+
         // Act
-        let response = send_request(request, false).unwrap();
+        let response = requester.send_request(request).unwrap();
 
         // Assert
         assert_eq!(response.status_code, 200);
