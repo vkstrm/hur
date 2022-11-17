@@ -2,32 +2,82 @@ use std::net::{SocketAddr,TcpStream};
 use std::io::{Read, Write};
 
 use native_tls::TlsConnector;
+use std::time::Duration;
 
 use crate::error::Error;
 use crate::error;
 
-pub fn http_request(addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error> {
-    log::info!("Connecting to {}", addr.to_string());
-    let mut stream = TcpStream::connect(addr)?;
-    let mut response_buffer = Vec::new();
- 
-    do_http_request(&mut stream,request_str.as_bytes(), &mut response_buffer)?;
-    Ok(response_buffer)
+pub trait Connector {
+    fn http_request(&self, addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error>;
+    fn https_request(&self, addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error>;
 }
 
-pub fn https_request(addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
-    log::info!("Connecting to {}", addr.to_string());
-    let stream = TcpStream::connect(addr)?;
-    let mut response_buffer = Vec::new();
-
-    do_https_request(stream, domain, request_str.as_bytes(), &mut response_buffer)?;
-    Ok(response_buffer)
+pub struct RegularConnector {
+    timeout: u64
 }
 
-pub fn proxy_https_request(proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
-    let mut stream = TcpStream::connect(proxy_addr)?;
-    connect_proxy(&mut stream, domain, proxy_addr)?;
-    tls_request(stream, domain, request_str.as_bytes())
+pub struct ProxyConnector {
+    timeout: u64
+}
+
+impl RegularConnector {
+    pub fn new(timeout: u64) -> Self {
+        RegularConnector { timeout }
+    }
+}
+
+impl Connector for RegularConnector {
+    fn http_request(&self, addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error> {
+        log::info!("Connecting to {}", addr.to_string());
+        let mut stream = connect_timeout(&addr, self.timeout)?;
+        let mut response_buffer = Vec::new();
+     
+        do_http_request(&mut stream,request_str.as_bytes(), &mut response_buffer)?;
+        Ok(response_buffer)
+    }
+    
+    fn https_request(&self, addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
+        log::info!("Connecting to {}", addr.to_string());
+        let stream = connect_timeout(&addr, self.timeout)?;
+        let mut response_buffer = Vec::new();
+    
+        do_https_request(stream, domain, request_str.as_bytes(), &mut response_buffer)?;
+        Ok(response_buffer)
+    }
+}
+
+impl ProxyConnector {
+    pub fn new(timeout: u64) -> Self {
+        ProxyConnector { timeout }
+    }
+}
+
+impl Connector for ProxyConnector {
+    fn http_request(&self, addr: SocketAddr, request_str: &str) -> Result<Vec<u8>, Error> {
+        log::info!("Connecting to {}", addr.to_string());
+        let mut stream = connect_timeout(&addr, self.timeout)?;
+        let mut response_buffer = Vec::new();
+     
+        do_http_request(&mut stream,request_str.as_bytes(), &mut response_buffer)?;
+        Ok(response_buffer)
+    }
+
+    fn https_request(&self, proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
+        let mut stream = connect_timeout(&proxy_addr, self.timeout)?;
+        connect_proxy(&mut stream, domain, proxy_addr)?;
+        tls_request(stream, domain, request_str.as_bytes())
+    }
+}
+
+fn connect_timeout(addr: &SocketAddr, timeout: u64) -> Result<TcpStream, Error> {
+    let connection_duration = Duration::new(5, 0);
+    let stream = TcpStream::connect_timeout(addr, connection_duration)?;
+    let read_write_duration= Some(Duration::new(timeout / 2, 0));
+
+    stream.set_read_timeout(read_write_duration)?;
+    stream.set_write_timeout(read_write_duration)?;
+
+    Ok(stream)
 }
 
 fn connect_proxy(stream: &mut TcpStream, domain: &str, proxy_addr: SocketAddr) -> Result<(), Error> {
@@ -69,7 +119,7 @@ fn do_https_request(stream: TcpStream, domain: &str, message: &[u8], buffer: &mu
     write_read(&mut stream, message, buffer)
 }
 
-fn write_read<T>(stream: &mut T, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> where T: Write + Read {
+fn write_read<T>(stream: &mut T, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> where T: Write + Read + std::marker::Send {
     stream.write_all(message)?;
     stream.read_to_end(buffer)?;
     Ok(())

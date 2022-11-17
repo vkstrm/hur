@@ -3,12 +3,15 @@ mod http;
 mod cli;
 mod logs;
 mod requester;
+mod proxy;
 
 use cli::output::{Output, handle_output};
 use cli::Input;
 use error::Error;
 use http::request::Request;
+use requester::connector::{Connector, ProxyConnector, RegularConnector};
 use url::Url;
+use requester::Requester;
 
 pub fn process(args: Vec<String>) {
     match handle_arguments(args) {
@@ -25,8 +28,18 @@ fn handle_arguments(args: Vec<String>) -> Result<(), Error> {
 fn handle_input(input: Input, output: Output) -> Result<(),Error> {
     let allow_proxy = input.allow_proxy;
     let request = setup_request(input)?;
+
+    let connector: Box<dyn Connector> = match (request.proxy, allow_proxy) {
+        (true, true) => Box::new(ProxyConnector::new(10)),
+        _ => Box::new(RegularConnector::new(10))
+    };
+
+    let requester = Requester::new(connector); 
+
+
     let request_output = serde_json::to_value(&request)?;
-    let response = requester::send_request(request, allow_proxy)?;
+    let response = requester.send_request(request)?;
+
     handle_output(response, request_output, output)
 }
 
