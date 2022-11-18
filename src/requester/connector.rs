@@ -62,9 +62,9 @@ impl Connector for ProxyConnector {
         Ok(response_buffer)
     }
 
-    fn https_request(&self, proxy_addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
-        let mut stream = connect_timeout(&proxy_addr, self.timeout)?;
-        connect_proxy(&mut stream, domain, proxy_addr)?;
+    fn https_request(&self, addr: SocketAddr, domain: &str, request_str: &str) -> Result<Vec<u8>, Error> {
+        let mut stream = connect_timeout(&addr, self.timeout)?;
+        connect_proxy(&mut stream, domain, addr)?;
         tls_request(stream, domain, request_str.as_bytes())
     }
 }
