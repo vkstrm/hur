@@ -92,12 +92,12 @@ fn connect_proxy(stream: &mut TcpStream, domain: &str, proxy_addr: SocketAddr) -
     Ok(())
 }
 
-fn connect_successful(buf: &[u8]) -> bool {
-    buf.starts_with(b"HTTP/1.1 200") && !buf.ends_with(b"\r\n\r\n")
-}
-
 fn connect_message(domain: &str) -> String {
     format!("CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n", domain)
+}
+
+fn connect_successful(buf: &[u8]) -> bool {
+    buf.starts_with(b"HTTP/1.1 200") && buf.ends_with(b"\r\n\r\n")
 }
 
 fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Vec<u8>, Error> {
@@ -119,7 +119,7 @@ fn do_https_request(stream: TcpStream, domain: &str, message: &[u8], buffer: &mu
     write_read(&mut stream, message, buffer)
 }
 
-fn write_read<T>(stream: &mut T, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> where T: Write + Read + std::marker::Send {
+fn write_read<T>(stream: &mut T, message: &[u8], buffer: &mut Vec<u8>) -> Result<(), Error> where T: Write + Read {
     stream.write_all(message)?;
     stream.read_to_end(buffer)?;
     Ok(())
