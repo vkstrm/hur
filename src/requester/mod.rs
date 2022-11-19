@@ -1,5 +1,5 @@
-use crate::error::Error;
 use crate::error;
+use crate::error::Error;
 use crate::http::{request::Request, response::Response, Scheme};
 
 pub mod connector;
@@ -7,14 +7,12 @@ pub mod connector;
 use connector::Connector;
 
 pub struct Requester {
-    connector: Box<dyn Connector>
+    connector: Box<dyn Connector>,
 }
 
 impl Requester {
     pub fn new(connector: Box<dyn Connector>) -> Self {
-        Requester {
-            connector
-        }
+        Requester { connector }
     }
 
     pub fn send_request(&self, request: Request) -> Result<Response, Error> {
@@ -23,8 +21,12 @@ impl Requester {
             let server_str = server.to_string();
             log::info!("Trying server {}", server_str);
             let result = match request.scheme {
-                Scheme::HTTP => self.connector.http_request(server, &request_str),
-                Scheme::HTTPS => self.connector.https_request(server, request.url.domain().unwrap(), &request_str)
+                Scheme::Http => self.connector.http_request(server, &request_str),
+                Scheme::Https => self.connector.https_request(
+                    server,
+                    request.url.domain().unwrap(),
+                    &request_str,
+                ),
             };
             match result {
                 Ok(response) => return Response::from_buffer(&response),
@@ -34,20 +36,22 @@ impl Requester {
                 }
             }
         }
-    
+
         error!("no server worked for request")
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use httptest::{Server, Expectation, matchers::*, responders::*};
-    use url::Url;
     use super::*;
-    use crate::{http::{Method, headers::Headers}, requester::connector::RegularConnector};
-    use serde_json;
+    use crate::{
+        http::{headers::Headers, Method},
+        requester::connector::RegularConnector,
+    };
+    use httptest::{matchers::*, responders::*, Expectation, Server};
     use serde::{Deserialize, Serialize};
+    use serde_json;
+    use url::Url;
 
     #[derive(Serialize, Deserialize)]
     struct TestType {
@@ -62,7 +66,7 @@ mod tests {
         let uri = server.url("/foo");
 
         let url = Url::parse(&uri.to_string()).unwrap();
-        let request = Request::new(url, Method::GET, Headers::new()).unwrap();
+        let request = Request::new(url, Method::Get, Headers::new()).unwrap();
 
         let requester = Requester::new(Box::new(RegularConnector::new(10)));
 
@@ -71,7 +75,15 @@ mod tests {
 
         // Assert
         assert_eq!(response.status_code, 200);
-        assert_eq!(response.headers.get("content-type").unwrap().first().unwrap(), "application/json");
+        assert_eq!(
+            response
+                .headers
+                .get("content-type")
+                .unwrap()
+                .first()
+                .unwrap(),
+            "application/json"
+        );
         let body: TestType = serde_json::from_str(&response.body.unwrap()).unwrap();
         assert_eq!(body.name, "Bob");
         assert_eq!(body.age, 25);

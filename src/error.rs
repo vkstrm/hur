@@ -5,7 +5,7 @@ macro_rules! error {
     };
     ($msg:stmt) => {
         return Err(Error::new($msg()))
-    }
+    };
 }
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ impl std::error::Error for Error {}
 
 impl Error {
     pub fn new(message: &str) -> Error {
-        Error{
+        Error {
             message: String::from(message),
         }
     }
@@ -64,7 +64,7 @@ impl From<serde_json::error::Error> for Error {
 impl From<log::SetLoggerError> for Error {
     fn from(err: log::SetLoggerError) -> Self {
         Error {
-            message: err.to_string()
+            message: err.to_string(),
         }
     }
 }

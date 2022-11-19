@@ -1,8 +1,8 @@
-use std::io::BufRead;
-use std::convert::TryInto;
 use super::headers::Headers;
-use crate::error::Error;
 use crate::error;
+use crate::error::Error;
+use std::convert::TryInto;
+use std::io::BufRead;
 
 const CRLF_LEN: usize = "\r\n".as_bytes().len();
 
@@ -23,23 +23,21 @@ impl Response {
         let (protocol, status_code, reason_phrase) = parse_status_line(&status_line)?;
         let headers = collect_headers(head)?;
 
-        if (status_code >= 100 && status_code <= 199) || status_code == 204 || status_code == 304 {
+        if (100..=199).contains(&status_code) || status_code == 204 || status_code == 304 {
             return Ok(Response {
                 protocol,
                 status_code,
                 reason_phrase,
                 headers,
                 body: None,
-            })
+            });
         }
 
         let body = if let Some(encoding) = headers.get("Transfer-Encoding") {
             let encoding = encoding[0].as_str();
             // TODO Check if header contains commas example "chunked, gzip"
             match encoding {
-                "chunked" => {
-                    chunked_body(bottom)?
-                },
+                "chunked" => chunked_body(bottom)?,
                 _ => None,
             }
         } else if let Some(encoding) = headers.get("Content-Length") {
@@ -65,8 +63,8 @@ fn get_status_line(head: &[u8]) -> Result<(String, &[u8]), Error> {
             Ok(l) => {
                 let len = l.len();
                 Ok((l, &head[len + CRLF_LEN..]))
-            },
-            Err(why) => error!(&why.to_string())
+            }
+            Err(why) => error!(&why.to_string()),
         }
     } else {
         error!("no status line in response")
@@ -74,7 +72,7 @@ fn get_status_line(head: &[u8]) -> Result<(String, &[u8]), Error> {
 }
 
 fn parse_status_line(status_line: &str) -> Result<(String, u32, String), Error> {
-    let mut splits: Vec<String> = status_line.splitn(3, ' ').map(|s| String::from(s)).collect();
+    let mut splits: Vec<String> = status_line.splitn(3, ' ').map(String::from).collect();
     if splits.len() != 3 {
         error!("improper status line")
     }
@@ -84,23 +82,16 @@ fn parse_status_line(status_line: &str) -> Result<(String, u32, String), Error> 
     Ok((protocol, status_code, reason_phrase))
 }
 
-
 fn collect_head(buf: &[u8]) -> &[u8] {
     let mut taken = 0;
-    let mut iter = buf.iter().as_slice().lines();
-    while let Some(line) = iter.next() {
-        match line {
-            Ok(l) => {
-                if l.is_empty() {
-                    break;
-                }
-                taken += l.len() + CRLF_LEN;
-            },
-            _ => {}
+    for line in buf.iter().as_slice().lines().flatten() {
+        if line.is_empty() {
+            break;
         }
+        taken += line.len() + CRLF_LEN;
     }
-    
-    return &buf[..taken];
+
+    &buf[..taken]
 }
 
 fn collect_body(from_index: usize, buffer: &[u8]) -> &[u8] {
@@ -109,17 +100,17 @@ fn collect_body(from_index: usize, buffer: &[u8]) -> &[u8] {
 
 fn collect_headers(head: &[u8]) -> Result<Headers, Error> {
     let mut headers = Headers::new();
-    let mut lines = head.iter().as_slice().lines();
-    while let Some(line_res) = lines.next() {
+    let lines = head.iter().as_slice().lines();
+    for line_res in lines {
         match line_res {
             Ok(line) => {
                 let splits: Vec<&str> = line.splitn(2, ':').collect();
                 if splits.len() != 2 {
                     error!("incorrect header format")
                 }
-                headers.add(splits[0].trim(), splits[1].trim());        
-            },
-            Err(why) => error!(&why.to_string())
+                headers.add(splits[0].trim(), splits[1].trim());
+            }
+            Err(error) => error!(&error.to_string()),
         }
     }
     Ok(headers)
@@ -130,18 +121,21 @@ fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
     lines.next(); // Advance past empty line
     let (chunk_size, chunk_line_size) = if let Some(line_res) = lines.next() {
         match line_res {
-            Ok(line) => {
-                (hexstr_to_dec(&line), line.as_bytes().len() + CRLF_LEN)
-            },
-            Err(why) => error!(&why.to_string())
+            Ok(line) => (hexstr_to_dec(&line), line.as_bytes().len() + CRLF_LEN),
+            Err(why) => error!(&why.to_string()),
         }
     } else {
         (0, 0)
     };
 
-    if &chunk_size < &buf[CRLF_LEN + chunk_line_size..].len() {
+    if chunk_size < buf[CRLF_LEN + chunk_line_size..].len() {
         // Why does times 3 work?
-        return Ok(Some(String::from_utf8(buf[CRLF_LEN + chunk_line_size..(CRLF_LEN * 3) + chunk_size].to_vec()).unwrap()))
+        return Ok(Some(
+            String::from_utf8(
+                buf[CRLF_LEN + chunk_line_size..(CRLF_LEN * 3) + chunk_size].to_vec(),
+            )
+            .unwrap(),
+        ));
     }
 
     Ok(None)
@@ -150,10 +144,10 @@ fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
 fn content_length_body(content_length: usize, buf: &[u8]) -> Result<String, Error> {
     let mut lines = buf.iter().as_slice().lines();
     lines.next();
-    let body_vec = buf[CRLF_LEN..content_length  + CRLF_LEN].to_vec();
+    let body_vec = buf[CRLF_LEN..content_length + CRLF_LEN].to_vec();
     match String::from_utf8(body_vec) {
         Ok(body) => Ok(body),
-        Err(why) => error!(&why.to_string()) 
+        Err(why) => error!(&why.to_string()),
     }
 }
 
@@ -175,7 +169,7 @@ fn hexstr_to_dec(s: &str) -> usize {
                 'd' => 13 * with_n,
                 'e' => 14 * with_n,
                 'f' => 15 * with_n,
-                _ => 0, 
+                _ => 0,
             };
         }
     }
@@ -197,13 +191,15 @@ fn test_parse_status_line() {
     assert_eq!(reason_phrase, "Bad Request");
 }
 
-
 #[test]
 fn test_collect_headers() {
     let head = r#"Content-Type:application/json
     Content-Length:5000"#;
     let headers = collect_headers(head.as_bytes()).unwrap();
-    assert_eq!(headers.get("Content-Type"), Some(&vec!["application/json".to_string()]))
+    assert_eq!(
+        headers.get("Content-Type"),
+        Some(&vec!["application/json".to_string()])
+    )
 }
 
 #[test]

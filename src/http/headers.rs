@@ -1,17 +1,18 @@
-use std::collections::{HashMap, hash_map};
+use std::collections::{hash_map, HashMap};
 use std::fmt::Display;
 
 use serde::ser::SerializeMap;
 
 #[derive(Debug)]
 pub struct Headers {
-    internal_headers: HashMap<String, Vec<String>>
+    internal_headers: HashMap<String, Vec<String>>,
 }
 
 impl serde::Serialize for Headers {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-            S: serde::Serializer {
+        S: serde::Serializer,
+    {
         let mut map = serializer.serialize_map(Some(self.internal_headers.len()))?;
         for (k, v) in &self.internal_headers {
             map.serialize_entry(&k, &v)?;
@@ -23,7 +24,7 @@ impl serde::Serialize for Headers {
 impl Headers {
     pub fn new() -> Headers {
         Headers {
-            internal_headers: HashMap::<String, Vec<String>>::new()
+            internal_headers: HashMap::<String, Vec<String>>::new(),
         }
     }
 
@@ -34,7 +35,8 @@ impl Headers {
                 None => panic!("no vec for key"),
             }
         } else {
-            self.internal_headers.insert(key.to_string(), vec![value.to_string()]);
+            self.internal_headers
+                .insert(key.to_string(), vec![value.to_string()]);
         }
     }
 
@@ -44,7 +46,7 @@ impl Headers {
             match key.as_str() {
                 "Connection" | "Host" => {
                     self.internal_headers.insert(key, val);
-                },
+                }
                 _ => {
                     for v in val {
                         self.add(&key, &v);
@@ -62,14 +64,14 @@ impl Headers {
                 } else {
                     None
                 }
-            },
+            }
             None => None,
         }
     }
 
     pub fn iter(&self) -> HeaderIterator {
-        HeaderIterator{
-            iterator: self.internal_headers.iter()
+        HeaderIterator {
+            iterator: self.internal_headers.iter(),
         }
     }
 }
@@ -90,9 +92,8 @@ impl From<HashMap<String, String>> for Headers {
     }
 }
 
-
 pub struct HeaderIterator<'a> {
-    iterator: hash_map::Iter<'a, String, Vec<String>>
+    iterator: hash_map::Iter<'a, String, Vec<String>>,
 }
 
 impl<'a> Iterator for HeaderIterator<'a> {

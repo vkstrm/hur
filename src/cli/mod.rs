@@ -17,7 +17,7 @@ pub struct Input {
     pub headers: Headers,
     pub body: Option<String>,
     pub allow_proxy: bool,
-    pub timeout: u64
+    pub timeout: u64,
 }
 
 pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
@@ -32,7 +32,7 @@ pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
 }
 
 fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
-    let mut headers = headers(&matches)?;
+    let mut headers = headers(matches)?;
     let body = collect_body(
         matches.value_of("body"),
         matches.value_of("json"),
@@ -40,7 +40,7 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
     )?;
 
     let timeout = match matches.value_of("timeout") {
-        Some(timeout) => timeout.parse::<u64>().unwrap(), // TODO Solve better 
+        Some(timeout) => timeout.parse::<u64>().unwrap(), // TODO Solve better
         None => 10,
     };
 
@@ -50,7 +50,7 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
         headers,
         body,
         allow_proxy: !(matches.is_present("no-proxy")),
-        timeout
+        timeout,
     })
 }
 
@@ -63,10 +63,13 @@ fn parse_output(matches: &ArgMatches) -> Output {
 
 fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
     let mut headers = single_headers(matches.values_of("header"));
-    match json_headers(matches.value_of("headers"))? {
-        Some(h) => headers.append(h),
-        None => {}
-    }
+    if let Some(h) = json_headers(matches.value_of("headers"))? {
+        headers.append(h)
+    };
+    // match json_headers(matches.value_of("headers"))? {
+    //     Some(h) => headers.append(h),
+    //     None => {}
+    // }
     Ok(headers)
 }
 
@@ -95,7 +98,7 @@ fn json_headers(headers_json: Option<&str>) -> Result<Option<Headers>, Error> {
                 serde_json::from_str(&json_string)?;
             Ok(Some(Headers::from(map)))
         }
-        None => return Ok(None),
+        None => Ok(None),
     }
 }
 
@@ -135,16 +138,16 @@ fn enable_logging() -> Result<(), log::SetLoggerError> {
 
 fn get_method(method: &str) -> Method {
     match method.to_lowercase().as_str() {
-        "get" => Method::GET,
-        "post" => Method::POST,
-        "put" => Method::PUT,
-        "delete" => Method::DELETE,
-        "patch" => Method::PATCH,
-        "connect" => Method::CONNECT,
-        "options" => Method::OPTIONS,
-        "trace" => Method::TRACE,
-        "head" => Method::HEAD,
-        _ => Method::GET,
+        "get" => Method::Get,
+        "post" => Method::Post,
+        "put" => Method::Put,
+        "delete" => Method::Delete,
+        "patch" => Method::Patch,
+        "connect" => Method::Connect,
+        "options" => Method::Options,
+        "trace" => Method::Trace,
+        "head" => Method::Head,
+        _ => Method::Get,
     }
 }
 
@@ -211,7 +214,7 @@ fn use_clap(args: &[String]) -> ArgMatches {
             Arg::new("timeout")
                 .help("The read timeout in seconds for the request")
                 .long("timeout")
-                .takes_value(true)
+                .takes_value(true),
         )
         .get_matches_from(args);
 }

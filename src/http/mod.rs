@@ -2,21 +2,22 @@ use crate::error;
 use crate::error::Error;
 use std::convert::TryFrom;
 
-pub mod response;
-pub mod request;
 pub mod headers;
+pub mod request;
+pub mod response;
 
 #[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Method {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
-    OPTIONS,
-    TRACE,
-    PATCH,
-    CONNECT,
+    Get,
+    Post,
+    Put,
+    Delete,
+    Head,
+    Options,
+    Trace,
+    Patch,
+    Connect,
 }
 
 impl std::fmt::Display for Method {
@@ -26,9 +27,10 @@ impl std::fmt::Display for Method {
 }
 
 #[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Scheme {
-    HTTP,
-    HTTPS
+    Http,
+    Https,
 }
 
 impl TryFrom<&str> for Scheme {
@@ -36,9 +38,9 @@ impl TryFrom<&str> for Scheme {
 
     fn try_from(s: &str) -> Result<Scheme, Self::Error> {
         match s {
-            "http" => Ok(Scheme::HTTP),
-            "https" => Ok(Scheme::HTTPS),
-            _ => error!("hur only supports http/s")
+            "http" => Ok(Scheme::Http),
+            "https" => Ok(Scheme::Https),
+            _ => error!("hur only supports http/s"),
         }
     }
 }
