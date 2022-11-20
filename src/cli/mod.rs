@@ -66,10 +66,6 @@ fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
     if let Some(h) = json_headers(matches.value_of("headers"))? {
         headers.append(h)
     };
-    // match json_headers(matches.value_of("headers"))? {
-    //     Some(h) => headers.append(h),
-    //     None => {}
-    // }
     Ok(headers)
 }
 

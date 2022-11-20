@@ -62,6 +62,9 @@ impl Request {
     ) -> Result<Request, Error> {
         let mut request = Request::new(url, method, headers)?;
         request.body = Some(body.to_string());
+        request
+            .headers
+            .add("Content-Length", &body.as_bytes().len().to_string());
         Ok(request)
     }
 
