@@ -1,20 +1,44 @@
 # HUR
 
-CLI tool for making HTTP requests. 
-Written to learn more about Rust and HTTP.
+Command-line utility for making HTTP requests.
+
+Note: This program is not better than Curl. It will contain bugs and is unlikely to fully conform to the HTTP specification. I am however having fun writing it and find it to be useful in some situations.
+
 
 ## Usage
 
-- `-m` to select method. GET is default.
-- `-h, --header` and then `"header-name:header-value"` for adding headers.
-- `--body <body>` for sending a request body.
-- `--json` send a body and "Content-Type:application/json" header. 
-- `--help` for more information
+GET is the default method.
+```sh
+hur https://petstore.com/animals -h "header:value"
+```
+To use another method add `--method`
+```sh
+hur https://petstore.com/animals --method POST --body '{"name":"Luffy"}'
+```
+Using `--verbose` mode will print, in JSON, the request and response objects.
+```json
+{
+    "request": {
+        "method": "GET",
+        "headers": {},
+        "path": "/animals",
+        "etc" "..."
+    },
+    "response": {
+        "statusCode": 200,
+        "body": "{}",
+        "etc": "..."
+    }
+}
+```
+Use `--help` for more information.
 
 ## Proxy
 
-Proxy support with HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables. Disable proxy for request using `--no-proxy`
+Proxy support with HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables.
+Disable proxy for a request using `--no-proxy`
 
 ## Dependencies
 
-On Linux, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
+On Ubuntu, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
+Or Cargo will tell you what you need most likely.

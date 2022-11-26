@@ -152,20 +152,27 @@ fn use_clap(args: &[String]) -> ArgMatches {
         .version(crate_version!())
         .author(crate_authors!("\n"))
         .arg(
+            Arg::new("url")
+                .help("The URL for the request")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
                 .help("Full request and response output in JSON"),
         )
         .arg(Arg::new("info").long("info").help("Show info logging"))
-        .arg(Arg::new("url").required(true).takes_value(true))
         .arg(
             Arg::new("method")
                 .takes_value(true)
                 .short('m')
+                .long("method")
                 .default_value("get")
                 .possible_values(&[
-                    "get", "post", "put", "trace", "patch", "delete", "head", "options", "connect",
+                    "get", "GET", "post", "POST", "put", "PUT", "trace", "TRACE", "patch", "PATCH",
+                    "delete", "DELETE", "head", "HEAD", "options", "OPTIONS", "connect", "CONNECT",
                 ]),
         )
         .arg(
@@ -178,7 +185,7 @@ fn use_clap(args: &[String]) -> ArgMatches {
         )
         .arg(
             Arg::new("headers")
-                .help("Headers as a json string or file ending with .json")
+                .help("Headers as a JSON string or JSON file")
                 .takes_value(true)
                 .long("headers"),
         )

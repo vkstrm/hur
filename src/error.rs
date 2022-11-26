@@ -68,3 +68,11 @@ impl From<log::SetLoggerError> for Error {
         }
     }
 }
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(err: std::str::Utf8Error) -> Self {
+        Error {
+            message: err.to_string(),
+        }
+    }
+}

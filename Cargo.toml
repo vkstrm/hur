@@ -1,9 +1,15 @@
 [package]
 name = "hur"
 version = "0.1.0"
-description = "HTTP request CLI tool"
+description = "CLI HTTP requests, nothing more complicated than that."
+homepage = "https://github.com/vkstrm/hur"
+repository = "https://github.com/vkstrm/hur"
 authors = ["vkstrm <mongomoves@gmail.com>"]
 edition = "2018"
+keywords = ["cli", "http"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+publish = false
 
 [dependencies]
 regex = "1"
