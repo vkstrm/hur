@@ -9,7 +9,6 @@ edition = "2018"
 keywords = ["cli", "http"]
 categories = ["command-line-utilities"]
 readme = "README.md"
-publish = false
 license = "MIT"
 
 [dependencies]
