@@ -4,6 +4,15 @@ Command-line utility for making HTTP requests.
 
 Note: This program is not better than Curl. It will contain bugs and is unlikely to fully conform to the HTTP specification. I am however having fun writing it and find it to be useful in some situations.
 
+## Installation 
+```sh
+cargo install hur
+```
+### Dependencies
+
+On Ubuntu, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
+
+Or let Cargo tell you what you need.
 
 ## Usage
 
@@ -37,8 +46,3 @@ Use `--help` for more information.
 
 Proxy support with HTTP_PROXY, HTTPS_PROXY and NO_PROXY environment variables.
 Disable proxy for a request using `--no-proxy`
-
-## Dependencies
-
-On Ubuntu, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
-Or Cargo will tell you what you need most likely.
