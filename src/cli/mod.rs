@@ -24,7 +24,7 @@ pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
     let matches = use_clap(&args);
     let input = parse_input(&matches)?;
     let output = parse_output(&matches);
-    if matches.is_present("info") {
+    if matches.get_flag("info") {
         enable_logging()?;
     }
 
@@ -34,68 +34,66 @@ pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
 fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
     let mut headers = headers(matches)?;
     let body = collect_body(
-        matches.value_of("body"),
-        matches.value_of("json"),
+        matches.get_one::<String>("body"),
+        matches.get_one::<String>("json"),
         &mut headers,
     )?;
 
-    let timeout = match matches.value_of("timeout") {
-        Some(timeout) => timeout.parse::<u64>().unwrap(), // TODO Solve better
+    let timeout = match matches.get_one::<u64>("timeout") {
+        Some(timeout) => timeout.to_owned(), // TODO Solve better
         None => 10,
     };
 
     Ok(Input {
-        url: matches.value_of("url").unwrap().to_string(),
-        method: get_method(matches.value_of("method").unwrap()),
+        url: matches.get_one::<String>("url").unwrap().to_owned(),
+        method: get_method(matches.get_one::<String>("method").unwrap()),
         headers,
         body,
-        allow_proxy: !(matches.is_present("no-proxy")),
+        allow_proxy: !(matches.get_flag("no-proxy")),
         timeout,
     })
 }
 
 fn parse_output(matches: &ArgMatches) -> Output {
     Output {
-        verbose: matches.is_present("verbose"),
-        no_body: matches.is_present("no-body"),
+        verbose: matches.get_flag("verbose"),
+        no_body: matches.get_flag("no-body"),
     }
 }
 
 fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
-    let mut headers = single_headers(matches.values_of("header"));
-    if let Some(h) = json_headers(matches.value_of("headers"))? {
+    let mut headers = match matches.get_many::<String>("header") {
+        Some(headers) => {
+            let h: Vec<&String> = headers.collect();
+            single_headers(h)
+        }
+        None => Headers::new(),
+    };
+
+    if let Some(h) = matches.get_one::<String>("headers") {
+        let h = json_headers(h)?;
         headers.append(h)
     };
+
     Ok(headers)
 }
 
-fn single_headers(headers_option: Option<clap::Values>) -> Headers {
-    match headers_option {
-        Some(values) => {
-            let mut headers = Headers::new();
-            for val in values {
-                let splits: Vec<&str> = val.splitn(2, ':').collect();
-                headers.add(splits[0], splits[1]);
-            }
-            headers
-        }
-        None => Headers::new(),
+fn single_headers(headers: Vec<&String>) -> Headers {
+    let mut new_headers = Headers::new();
+    for val in headers {
+        let splits: Vec<&str> = val.splitn(2, ':').collect();
+        new_headers.add(splits[0], splits[1]);
     }
+    new_headers
 }
 
-fn json_headers(headers_json: Option<&str>) -> Result<Option<Headers>, Error> {
-    match headers_json {
-        Some(value) => {
-            let json_string = match value.ends_with(".json") {
-                true => read_file(value)?,
-                false => value.to_string(),
-            };
-            let map: std::collections::HashMap<String, String> =
-                serde_json::from_str(&json_string)?;
-            Ok(Some(Headers::from(map)))
-        }
-        None => Ok(None),
-    }
+fn json_headers(headers_json: &str) -> Result<Headers, Error> {
+    let json_string = match headers_json.ends_with(".json") {
+        true => read_file(headers_json)?,
+        false => headers_json.to_string(),
+    };
+    let map: std::collections::HashMap<String, String> = serde_json::from_str(&json_string)?;
+    Ok(Headers::from(map))
 }
 
 fn read_file(path: &str) -> Result<String, Error> {
@@ -106,8 +104,8 @@ fn read_file(path: &str) -> Result<String, Error> {
 }
 
 fn collect_body(
-    body_option: Option<&str>,
-    json_option: Option<&str>,
+    body_option: Option<&String>,
+    json_option: Option<&String>,
     headers: &mut Headers,
 ) -> Result<Option<String>, Error> {
     let mut body: Option<String> = None;
@@ -148,29 +146,37 @@ fn get_method(method: &str) -> Method {
 }
 
 fn use_clap(args: &[String]) -> ArgMatches {
-    return clap::app_from_crate!(crate_name!())
+    clap::command!(crate_name!())
+        .disable_help_flag(true) // Help how???
+        .arg_required_else_help(true)
         .version(crate_version!())
         .author(crate_authors!("\n"))
         .arg(
             Arg::new("url")
                 .help("The URL for the request")
-                .required(true)
-                .takes_value(true),
+                .required(true),
         )
         .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
-                .help("Full request and response output in JSON"),
+                .help("Full request and response output in JSON")
+                .action(clap::ArgAction::SetTrue),
         )
-        .arg(Arg::new("info").long("info").help("Show info logging"))
+        .arg(
+            Arg::new("info")
+                .long("info")
+                .help("Show info logging")
+                .action(clap::ArgAction::SetTrue),
+        )
         .arg(
             Arg::new("method")
-                .takes_value(true)
+                .help("The HTTP method to use for the request")
                 .short('m')
                 .long("method")
                 .default_value("get")
-                .possible_values(&[
+                .hide_possible_values(true)
+                .value_parser([
                     "get", "GET", "post", "POST", "put", "PUT", "trace", "TRACE", "patch", "PATCH",
                     "delete", "DELETE", "head", "HEAD", "options", "OPTIONS", "connect", "CONNECT",
                 ]),
@@ -178,54 +184,52 @@ fn use_clap(args: &[String]) -> ArgMatches {
         .arg(
             Arg::new("header")
                 .help("Header for request")
-                .takes_value(true)
                 .short('h')
                 .long("header")
-                .multiple_occurrences(true),
+                .action(clap::ArgAction::Append),
         )
         .arg(
             Arg::new("headers")
                 .help("Headers as a JSON string or JSON file")
-                .takes_value(true)
                 .long("headers"),
         )
         .arg(
             Arg::new("body")
                 .help("Body for request")
                 .long("body")
-                .conflicts_with("json")
-                .takes_value(true),
+                .conflicts_with("json"),
         )
         .arg(
             Arg::new("json")
                 .help("Send body with Content-Type:application/json")
                 .long("json")
-                .conflicts_with("body")
-                .takes_value(true),
+                .conflicts_with("body"),
         )
         .arg(
             Arg::new("no-body")
                 .help("Don't print response body")
-                .long("no-body"),
+                .long("no-body")
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("no-proxy")
                 .help("Do not proxy request")
-                .long("no-proxy"),
+                .long("no-proxy")
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("timeout")
                 .help("The read timeout in seconds for the request")
-                .long("timeout")
-                .takes_value(true),
+                .long("timeout"),
         )
-        .get_matches_from(args);
+        .get_matches_from(args)
 }
 
 #[test]
 fn test_collect_body() {
     let mut headers = Headers::new();
-    let body_opt = Some("form1:value2");
+    let input = String::from("form1:value2");
+    let body_opt = Some(&input);
     let json_opt = None;
 
     let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
@@ -236,8 +240,9 @@ fn test_collect_body() {
 #[test]
 fn test_collect_json_body() {
     let mut headers = Headers::new();
+    let input = String::from(r#"{"key":"value"}"#);
     let body_opt = None;
-    let json_opt = Some(r#"{"key":"value"}"#);
+    let json_opt = Some(&input);
 
     let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
     assert!(body.is_some());

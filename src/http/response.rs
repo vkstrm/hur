@@ -132,7 +132,8 @@ fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
 
     if chunk_size < buf[CRLF_LEN + chunk_line_size..].len() {
         // Why does times 3 work?
-        let body = String::from_utf8_lossy(&buf[CRLF_LEN + chunk_line_size..(CRLF_LEN * 3) + chunk_size]);
+        let body =
+            String::from_utf8_lossy(&buf[CRLF_LEN + chunk_line_size..(CRLF_LEN * 3) + chunk_size]);
 
         return Ok(Some(body.to_string()));
     }
