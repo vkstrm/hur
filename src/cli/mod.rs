@@ -40,7 +40,7 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
     )?;
 
     let timeout = match matches.get_one::<u64>("timeout") {
-        Some(timeout) => timeout.to_owned(), // TODO Solve better
+        Some(timeout) => timeout.to_owned(),
         None => 10,
     };
 
@@ -65,7 +65,7 @@ fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
     let mut headers = match matches.get_many::<String>("header") {
         Some(headers) => {
             let h: Vec<&String> = headers.collect();
-            single_headers(h)
+            single_headers(h)?
         }
         None => Headers::new(),
     };
@@ -78,13 +78,21 @@ fn headers(matches: &ArgMatches) -> Result<Headers, Error> {
     Ok(headers)
 }
 
-fn single_headers(headers: Vec<&String>) -> Headers {
+fn single_headers(headers: Vec<&String>) -> Result<Headers, Error> {
     let mut new_headers = Headers::new();
-    for val in headers {
-        let splits: Vec<&str> = val.splitn(2, ':').collect();
-        new_headers.add(splits[0], splits[1]);
+    for header in headers {
+        let (key, val) = header_key_val(header)?;
+        new_headers.add(key, val);
     }
-    new_headers
+    Ok(new_headers)
+}
+
+fn header_key_val(header: &String) -> Result<(&str, &str), Error> {
+    let splits: Vec<&str> = header.splitn(2, ':').collect();
+    if splits.len() < 2 {
+        error!(&format!("invalid header \"{}\"", header))
+    }
+    Ok((splits[0].trim(), splits[1].trim()))
 }
 
 fn json_headers(headers_json: &str) -> Result<Headers, Error> {
@@ -220,9 +228,40 @@ fn use_clap(args: &[String]) -> ArgMatches {
         .arg(
             Arg::new("timeout")
                 .help("The read timeout in seconds for the request")
-                .long("timeout"),
+                .long("timeout")
+                .value_parser(clap::value_parser!(u64)),
         )
         .get_matches_from(args)
+}
+
+#[test]
+fn test_valid_single_headers() {
+    let headers = vec![
+        "key:value".to_string(),
+        "key2: value".to_string(),
+        "key3 :value".to_string(),
+        "key4 : value".to_string(),
+    ];
+    let headers = single_headers(headers.iter().collect());
+    assert!(headers.is_ok());
+    let headers = headers.unwrap();
+    assert!(headers.get("key").is_some());
+    assert!(headers.get("key2").is_some());
+    assert!(headers.get("key3").is_some());
+    assert!(headers.get("key4").is_some());
+}
+
+#[test]
+fn test_invalid_headers() {
+    let headers = vec![
+        "key".to_string(),
+        "key=value".to_string(),
+        "key value".to_string(),
+    ];
+    for header in headers {
+        let r = header_key_val(&header);
+        assert!(r.is_err());
+    }
 }
 
 #[test]
