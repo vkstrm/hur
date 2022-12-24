@@ -21,7 +21,8 @@ pub struct Input {
 }
 
 pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
-    let matches = use_clap(&args);
+    let command = use_clap();
+    let matches = command.get_matches_from(args);
     let input = parse_input(&matches)?;
     let output = parse_output(&matches);
     if matches.get_flag("info") {
@@ -33,11 +34,7 @@ pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
 
 fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
     let mut headers = headers(matches)?;
-    let body = collect_body(
-        matches.get_one::<String>("body"),
-        matches.get_one::<String>("json"),
-        &mut headers,
-    )?;
+    let body = parse_body(matches, &mut headers)?;
 
     let timeout = match matches.get_one::<u64>("timeout") {
         Some(timeout) => timeout.to_owned(),
@@ -52,6 +49,30 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
         allow_proxy: !(matches.get_flag("no-proxy")),
         timeout,
     })
+}
+
+fn parse_body(matches: &ArgMatches, headers: &mut Headers) -> Result<Option<String>, Error> {
+    if let Some(body) = matches.get_one::<String>("body") {
+        return Ok(Some(body.to_string()));
+    }
+    if let Some(body) = matches.get_one::<String>("json") {
+        match serde_json::from_str::<serde_json::Value>(body) {
+            Ok(_) => {
+                headers.add("Content-Type", "application/json");
+                return Ok(Some(body.to_string()));
+            }
+            Err(why) => error!(&why.to_string()),
+        };
+    }
+    if let Some(path) = matches.get_one::<String>("body-file") {
+        let file_str = read_file(path)?;
+        if path.ends_with(".json") {
+            headers.add("Content-Type", "application/json");
+        }
+        return Ok(Some(file_str));
+    }
+
+    Ok(None)
 }
 
 fn parse_output(matches: &ArgMatches) -> Output {
@@ -105,32 +126,11 @@ fn json_headers(headers_json: &str) -> Result<Headers, Error> {
 }
 
 fn read_file(path: &str) -> Result<String, Error> {
+    let path = std::path::PathBuf::from(path);
     let mut file = std::fs::File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
     Ok(buf)
-}
-
-fn collect_body(
-    body_option: Option<&String>,
-    json_option: Option<&String>,
-    headers: &mut Headers,
-) -> Result<Option<String>, Error> {
-    let mut body: Option<String> = None;
-    if let Some(body_str) = body_option {
-        body = Some(body_str.to_string());
-    }
-    if let Some(body_str) = json_option {
-        match serde_json::from_str::<serde_json::Value>(body_str) {
-            Ok(_) => {
-                body = Some(body_str.to_string());
-                headers.add("Content-Type", "application/json");
-            }
-            Err(why) => error!(&why.to_string()),
-        };
-    }
-
-    Ok(body)
 }
 
 fn enable_logging() -> Result<(), log::SetLoggerError> {
@@ -153,7 +153,7 @@ fn get_method(method: &str) -> Method {
     }
 }
 
-fn use_clap(args: &[String]) -> ArgMatches {
+fn use_clap() -> clap::Command {
     clap::command!(crate_name!())
         .disable_help_flag(true) // Help how???
         .arg_required_else_help(true)
@@ -214,6 +214,13 @@ fn use_clap(args: &[String]) -> ArgMatches {
                 .conflicts_with("body"),
         )
         .arg(
+            Arg::new("body-file")
+                .help("Supply path to file to use as body")
+                .long("body-file")
+                .conflicts_with("body")
+                .conflicts_with("json"),
+        )
+        .arg(
             Arg::new("no-body")
                 .help("Don't print response body")
                 .long("no-body")
@@ -231,7 +238,6 @@ fn use_clap(args: &[String]) -> ArgMatches {
                 .long("timeout")
                 .value_parser(clap::value_parser!(u64)),
         )
-        .get_matches_from(args)
 }
 
 #[test]
@@ -266,24 +272,50 @@ fn test_invalid_headers() {
 
 #[test]
 fn test_collect_body() {
-    let mut headers = Headers::new();
-    let input = String::from("form1:value2");
-    let body_opt = Some(&input);
-    let json_opt = None;
+    let input = vec!["hur", "http://localhost", "--body", "form:value"];
+    let command = use_clap();
+    let matches = command.get_matches_from(input);
 
-    let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
+    let mut headers = Headers::new();
+    let body = parse_body(&matches, &mut headers).unwrap();
+
     assert!(body.is_some());
-    assert_eq!(body.unwrap(), "form1:value2");
+    assert_eq!(body.unwrap(), "form:value");
 }
 
 #[test]
 fn test_collect_json_body() {
-    let mut headers = Headers::new();
-    let input = String::from(r#"{"key":"value"}"#);
-    let body_opt = None;
-    let json_opt = Some(&input);
+    let input = vec!["hur", "http://localhost", "--json", r#"{"key":"value"}"#];
+    let command = use_clap();
+    let matches = command.get_matches_from(input);
 
-    let body = collect_body(body_opt, json_opt, &mut headers).unwrap();
+    let mut headers = Headers::new();
+    let body = parse_body(&matches, &mut headers).unwrap();
+
+    assert!(body.is_some());
+    assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
+    assert!(headers.get("Content-Type").is_some());
+}
+
+#[test]
+fn test_data_body() {
+    let temp_dir = std::env::temp_dir();
+    let temp_file = temp_dir.join("data.json");
+    let input = vec![
+        "hur",
+        "http://localhost",
+        "--body-file",
+        temp_file.to_str().unwrap(),
+    ];
+    let command = use_clap();
+    let matches = command.get_matches_from(input);
+    let mut file = std::fs::File::create(temp_file).unwrap();
+    use std::io::Write;
+    file.write(br#"{"key":"value"}"#).unwrap();
+
+    let mut headers = Headers::new();
+    let body = parse_body(&matches, &mut headers).unwrap();
+
     assert!(body.is_some());
     assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
     assert!(headers.get("Content-Type").is_some());
