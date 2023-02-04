@@ -28,10 +28,12 @@ pub struct Request {
     body: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     query: Option<String>,
+    #[serde(skip)]
+    pub timeout: u64,
 }
 
 impl Request {
-    pub fn new(url: Url, method: Method, headers: Headers) -> Result<Request, Error> {
+    pub fn new(url: Url, method: Method, headers: Headers) -> Result<Self, Error> {
         let scheme = Scheme::try_from(url.scheme())?;
         let url_servers = find_socket_addresses(&url, &scheme)?;
         let (servers, proxy) = match should_proxy(&url, &url_servers, &scheme)? {
@@ -51,6 +53,7 @@ impl Request {
             body: None,
             query: url.query().map_or_else(|| None, |s| Some(String::from(s))),
             url,
+            timeout: 10,
         })
     }
 
@@ -68,12 +71,12 @@ impl Request {
         Ok(request)
     }
 
-    fn build_request(&self, path: &str) -> String {
-        let mut message = self.make_status_line(path);
-        self.add_headers(&mut message);
-        self.add_body(&mut message);
-        message.push_str("\r\n\r\n");
-        message
+    pub fn disable_proxy(&mut self) {
+        self.proxy = false;
+    }
+
+    pub fn set_timeout(&mut self, timeout: u64) {
+        self.timeout = timeout;
     }
 
     pub fn build(&self) -> String {
@@ -82,6 +85,14 @@ impl Request {
             _ => &self.path,
         };
         self.build_request(path)
+    }
+
+    fn build_request(&self, path: &str) -> String {
+        let mut message = self.make_status_line(path);
+        self.add_headers(&mut message);
+        self.add_body(&mut message);
+        message.push_str("\r\n\r\n");
+        message
     }
 
     fn make_status_line(&self, path: &str) -> String {

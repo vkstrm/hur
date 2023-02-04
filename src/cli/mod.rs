@@ -5,13 +5,15 @@ use super::logs;
 
 use crate::error;
 use crate::error::Error;
+use crate::http::request::Request;
 
 use clap::{crate_authors, crate_name, crate_version, Arg, ArgMatches};
 
 pub mod output;
 use output::Output;
+use url::Url;
 
-pub struct Input {
+struct Input {
     pub url: String,
     pub method: Method,
     pub headers: Headers,
@@ -20,11 +22,41 @@ pub struct Input {
     pub timeout: u64,
 }
 
-pub fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
+pub fn create_request(args: Vec<String>) -> Result<(Request, Output), Error> {
+    let (input, output) = parse_args(args)?;
+    let parsed_url = parse_url(&input.url)?;
+
+    let mut request = match input.body {
+        Some(body) => Request::with_body(parsed_url, input.method, input.headers, &body),
+        None => Request::new(parsed_url, input.method, input.headers),
+    }?;
+
+    if !input.allow_proxy {
+        request.disable_proxy();
+    }
+
+    request.set_timeout(input.timeout);
+
+    Ok((request, output))
+}
+
+fn parse_url(url: &str) -> Result<Url, Error> {
+    let parsed_url = match Url::parse(url) {
+        Ok(url) => url,
+        Err(why) => error!(&why.to_string()),
+    };
+    if !parsed_url.has_host() {
+        error!("no host in input");
+    }
+    Ok(parsed_url)
+}
+
+fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
     let command = use_clap();
     let matches = command.get_matches_from(args);
     let input = parse_input(&matches)?;
     let output = parse_output(&matches);
+    
     if matches.get_flag("info") {
         enable_logging()?;
     }
