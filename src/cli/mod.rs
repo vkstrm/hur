@@ -56,7 +56,7 @@ fn parse_args(args: Vec<String>) -> Result<(Input, Output), Error> {
     let matches = command.get_matches_from(args);
     let input = parse_input(&matches)?;
     let output = parse_output(&matches);
-    
+
     if matches.get_flag("info") {
         enable_logging()?;
     }
@@ -75,7 +75,7 @@ fn parse_input(matches: &ArgMatches) -> Result<Input, Error> {
 
     Ok(Input {
         url: matches.get_one::<String>("url").unwrap().to_owned(),
-        method: get_method(matches.get_one::<String>("method").unwrap()),
+        method: get_method(matches),
         headers,
         body,
         allow_proxy: !(matches.get_flag("no-proxy")),
@@ -170,18 +170,27 @@ fn enable_logging() -> Result<(), log::SetLoggerError> {
     log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
 }
 
-fn get_method(method: &str) -> Method {
-    match method.to_lowercase().as_str() {
-        "get" => Method::Get,
-        "post" => Method::Post,
-        "put" => Method::Put,
-        "delete" => Method::Delete,
-        "patch" => Method::Patch,
-        "connect" => Method::Connect,
-        "options" => Method::Options,
-        "trace" => Method::Trace,
-        "head" => Method::Head,
-        _ => Method::Get,
+fn get_method(matches: &ArgMatches) -> Method {
+    let mut method = Method::Get;
+    if matches.get_one::<String>("json").is_some() {
+        method = Method::Post;
+    }
+
+    if let Some(m) = matches.get_one::<String>("method") {
+        match m.to_lowercase().as_str() {
+            "get" => Method::Get,
+            "post" => Method::Post,
+            "put" => Method::Put,
+            "delete" => Method::Delete,
+            "patch" => Method::Patch,
+            "connect" => Method::Connect,
+            "options" => Method::Options,
+            "trace" => Method::Trace,
+            "head" => Method::Head,
+            _ => method,
+        }
+    } else {
+        method
     }
 }
 
@@ -214,7 +223,6 @@ fn use_clap() -> clap::Command {
                 .help("The HTTP method to use for the request")
                 .short('m')
                 .long("method")
-                .default_value("get")
                 .hide_possible_values(true)
                 .value_parser([
                     "get", "GET", "post", "POST", "put", "PUT", "trace", "TRACE", "patch", "PATCH",
