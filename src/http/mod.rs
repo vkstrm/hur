@@ -6,7 +6,7 @@ pub mod headers;
 pub mod request;
 pub mod response;
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, Clone, clap::ValueEnum)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Method {
     Get,
