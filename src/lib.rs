@@ -18,7 +18,7 @@ pub fn handle(args: Vec<String>) {
 }
 
 fn handle_args(args: Vec<String>) -> Result<(), Error> {
-    let (request, output) = cli::create_request(args)?;
+    let (request, verbose) = cli::create_request(args)?;
 
     let connector: Box<dyn Connector> = if request.proxy {
         Box::new(ProxyConnector::new(request.timeout))
@@ -31,5 +31,5 @@ fn handle_args(args: Vec<String>) -> Result<(), Error> {
     let request_output = serde_json::to_value(&request)?;
     let response = requester.send_request(request)?;
 
-    handle_output(response, request_output, output)
+    handle_output(response, request_output, verbose)
 }

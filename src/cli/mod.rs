@@ -11,7 +11,6 @@ use crate::http::request::Request;
 use clap::Parser;
 
 pub mod output;
-use output::Output;
 use url::Url;
 
 #[derive(Parser)]
@@ -66,7 +65,7 @@ struct Cli {
     pub timeout: Option<u64>,
 }
 
-pub fn create_request(args: Vec<String>) -> Result<(Request, Output), Error> {
+pub fn create_request(args: Vec<String>) -> Result<(Request, bool), Error> {
     let parser = Cli::parse_from(args);
 
     let parsed_url = parse_url(&parser.url)?;
@@ -88,13 +87,7 @@ pub fn create_request(args: Vec<String>) -> Result<(Request, Output), Error> {
         request.set_timeout(timeout);
     }
 
-    Ok((
-        request,
-        Output {
-            verbose: parser.verbose,
-            no_body: false,
-        },
-    ))
+    Ok((request, parser.verbose))
 }
 
 fn parse_url(url: &str) -> Result<Url, Error> {
@@ -113,7 +106,7 @@ fn parse_body(matches: &Cli, headers: &mut Headers) -> Result<Option<String>, Er
         return Ok(Some(body.to_string()));
     }
     if let Some(body) = &matches.json {
-        match serde_json::from_str::<serde_json::Value>(&body) {
+        match serde_json::from_str::<serde_json::Value>(body) {
             Ok(_) => {
                 headers.add("Content-Type", "application/json");
                 return Ok(Some(body.to_string()));
@@ -122,7 +115,7 @@ fn parse_body(matches: &Cli, headers: &mut Headers) -> Result<Option<String>, Er
         };
     }
     if let Some(path) = &matches.body_file {
-        let file_str = read_file(&path)?;
+        let file_str = read_file(path)?;
         match path.extension() {
             Some(extension) if extension == "json" => {
                 headers.add("Content-Type", "application/json")
@@ -142,7 +135,7 @@ fn headers(cli: &Cli) -> Result<Headers, Error> {
     };
 
     if let Some(h) = &cli.headers {
-        let h = json_headers(&h)?;
+        let h = json_headers(h)?;
         headers.append(h)
     };
 
@@ -152,7 +145,7 @@ fn headers(cli: &Cli) -> Result<Headers, Error> {
 fn single_headers(headers: &[String]) -> Result<Headers, Error> {
     let mut new_headers = Headers::new();
     for header in headers {
-        let (key, val) = header_key_val(&header)?;
+        let (key, val) = header_key_val(header)?;
         new_headers.add(key, val);
     }
     Ok(new_headers)
