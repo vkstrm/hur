@@ -6,6 +6,7 @@ use super::logs;
 
 use crate::error;
 use crate::error::Error;
+use crate::http::headers::Header;
 use crate::http::request::Request;
 
 use clap::Parser;
@@ -36,8 +37,8 @@ struct Cli {
     pub method: Method,
     #[arg(long)]
     pub info: bool,
-    #[arg(short = 'h', long, help = "Add header as 'key:value'")]
-    pub header: Option<Vec<String>>,
+    #[arg(short = 'h', long, help = "Add header as 'key:value'", value_parser = Header::try_from)]
+    pub header: Option<Vec<Header>>,
     #[arg(long, help = "Add headers as a JSON string or JSON file")]
     pub headers: Option<String>,
     #[arg(short, long, help = "Add request body")]
@@ -130,7 +131,7 @@ fn parse_body(matches: &Cli, headers: &mut Headers) -> Result<Option<String>, Er
 
 fn headers(cli: &Cli) -> Result<Headers, Error> {
     let mut headers = match &cli.header {
-        Some(headers) => single_headers(headers)?,
+        Some(headers) => Headers::from(headers),
         None => Headers::new(),
     };
 
@@ -140,23 +141,6 @@ fn headers(cli: &Cli) -> Result<Headers, Error> {
     };
 
     Ok(headers)
-}
-
-fn single_headers(headers: &[String]) -> Result<Headers, Error> {
-    let mut new_headers = Headers::new();
-    for header in headers {
-        let (key, val) = header_key_val(header)?;
-        new_headers.add(key, val);
-    }
-    Ok(new_headers)
-}
-
-fn header_key_val(header: &str) -> Result<(&str, &str), Error> {
-    let splits: Vec<&str> = header.splitn(2, ':').collect();
-    if splits.len() < 2 {
-        error!(&format!("invalid header \"{}\"", header))
-    }
-    Ok((splits[0].trim(), splits[1].trim()))
 }
 
 fn json_headers(headers_json: &str) -> Result<Headers, Error> {
@@ -179,36 +163,6 @@ fn read_file(path: &PathBuf) -> Result<String, Error> {
 fn enable_logging() -> Result<(), log::SetLoggerError> {
     static LOGGER: logs::Logger = logs::Logger;
     log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
-}
-
-#[test]
-fn test_valid_single_headers() {
-    let headers = vec![
-        "key:value".to_string(),
-        "key2: value".to_string(),
-        "key3 :value".to_string(),
-        "key4 : value".to_string(),
-    ];
-    let headers = single_headers(&headers);
-    assert!(headers.is_ok());
-    let headers = headers.unwrap();
-    assert!(headers.get("key").is_some());
-    assert!(headers.get("key2").is_some());
-    assert!(headers.get("key3").is_some());
-    assert!(headers.get("key4").is_some());
-}
-
-#[test]
-fn test_invalid_headers() {
-    let headers = vec![
-        "key".to_string(),
-        "key=value".to_string(),
-        "key value".to_string(),
-    ];
-    for header in headers {
-        let r = header_key_val(&header);
-        assert!(r.is_err());
-    }
 }
 
 #[test]
