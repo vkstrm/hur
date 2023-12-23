@@ -11,12 +11,11 @@
       let 
         pkgs = nixpkgs.legacyPackages.${system};
         manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
-        # formatter.${system} = pkgs.nixpkgs-fmt;
-        buildInputs = with pkgs; [ cargo rustc openssl ];
-        nativeBuildInputs = with pkgs; [ pkg-config ];
       in 
       with pkgs;
       {
+        # formatter.${system} = nixpkgs-fmt;
+
         devShells.default = mkShell {
           nativeBuildInputs = [ cargo rustc openssl pkg-config ];
         };
