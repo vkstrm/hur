@@ -1,4 +1,4 @@
-use std::collections::{hash_map, HashMap};
+use std::collections::{HashMap, hash_map};
 use std::fmt::Display;
 
 use serde::ser::SerializeMap;
@@ -27,7 +27,7 @@ impl Header {
 
 #[test]
 fn test_valid_header() {
-    let headers = vec![
+    let headers = [
         "key:value".to_string(),
         "key2: value".to_string(),
         "key3 :value".to_string(),
@@ -107,16 +107,9 @@ impl Headers {
     }
 
     pub fn get(&self, header: &str) -> Option<&Vec<String>> {
-        match self.internal_headers.get(header.to_lowercase().as_str()) {
-            Some(vec) => {
-                if !vec.is_empty() {
-                    Some(vec)
-                } else {
-                    None
-                }
-            }
-            None => None,
-        }
+        self.internal_headers
+            .get(header.to_lowercase().as_str())
+            .filter(|&vec| !vec.is_empty())
     }
 
     pub fn iter(&self) -> HeaderIterator {

@@ -96,10 +96,10 @@ mod tests {
 
     #[test]
     fn test_is_ip_address() {
-        assert_eq!(is_ip_address("129.0.0.1"), true);
-        assert_eq!(is_ip_address("129.0.*"), true);
-        assert_eq!(is_ip_address("132.*"), true);
-        assert_eq!(is_ip_address("localhost"), false);
+        assert!(is_ip_address("129.0.0.1"));
+        assert!(is_ip_address("129.0.*"));
+        assert!(is_ip_address("132.*"));
+        assert!(!is_ip_address("localhost"));
     }
 
     #[test]

@@ -4,7 +4,7 @@ use crate::error::Error;
 use std::convert::TryInto;
 use std::io::BufRead;
 
-const CRLF_LEN: usize = "\r\n".as_bytes().len();
+const CRLF_LEN: usize = "\r\n".len();
 
 #[derive(serde::Serialize, Debug)]
 pub struct Response {
@@ -86,7 +86,7 @@ fn parse_status_line(status_line: &str) -> Result<(String, u32, String), Error> 
 
 fn collect_head(buf: &[u8]) -> &[u8] {
     let mut taken = 0;
-    for line in buf.iter().as_slice().lines().flatten() {
+    for line in buf.iter().as_slice().lines().map_while(Result::ok) {
         if line.is_empty() {
             break;
         }
@@ -123,7 +123,7 @@ fn chunked_body(buf: &[u8]) -> Result<Option<String>, Error> {
     lines.next(); // Advance past empty line
     let (chunk_size, chunk_line_size) = if let Some(line_res) = lines.next() {
         match line_res {
-            Ok(line) => (hexstr_to_dec(&line), line.as_bytes().len() + CRLF_LEN),
+            Ok(line) => (hexstr_to_dec(&line), line.len() + CRLF_LEN),
             Err(why) => error!(&why.to_string()),
         }
     } else {
@@ -155,9 +155,7 @@ fn hexstr_to_dec(s: &str) -> usize {
     let mut sum = 0;
     let mut n: u32 = s.len().try_into().unwrap();
     for x in s.to_lowercase().chars() {
-        if n != 0 {
-            n -= 1;
-        }
+        n = n.saturating_sub(1);
         let with_n = u32::pow(16, n);
         if let Some(digit) = x.to_digit(10) {
             sum += digit * with_n;

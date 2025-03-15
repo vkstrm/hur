@@ -67,7 +67,7 @@ impl Request {
         request.body = Some(body.to_string());
         request
             .headers
-            .add("Content-Length", &body.as_bytes().len().to_string());
+            .add("Content-Length", &body.len().to_string());
         Ok(request)
     }
 

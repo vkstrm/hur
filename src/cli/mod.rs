@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 
-use super::http::{headers::Headers, Method};
+use super::http::{Method, headers::Headers};
 use super::logs;
 
 use crate::error;

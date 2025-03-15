@@ -1,6 +1,6 @@
 use crate::error;
 use crate::error::Error;
-use crate::http::{request::Request, response::Response, Scheme};
+use crate::http::{Scheme, request::Request, response::Response};
 
 pub mod connector;
 
@@ -45,12 +45,12 @@ impl Requester {
 mod tests {
     use super::*;
     use crate::{
-        http::{headers::Headers, Method},
+        http::{Method, headers::Headers},
         requester::connector::RegularConnector,
     };
-    use httptest::{matchers::*, responders::*, Expectation, Server};
+    use httptest::{Expectation, Server, matchers::*, responders::*};
     use serde::{Deserialize, Serialize};
-    use serde_json;
+
     use url::Url;
 
     #[derive(Serialize, Deserialize)]

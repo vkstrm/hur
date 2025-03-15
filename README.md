@@ -2,26 +2,23 @@
 
 Command-line utility for making HTTP requests.
 
-Note: This program is not better than Curl. It will contain bugs and is unlikely to fully conform to the HTTP specification. I am however having fun writing it and find it to be useful in some situations.
+Note: This program is not better than Curl.
+It will contain bugs and is unlikely to fully conform to the HTTP specification.
+I am however having fun writing it and find it to be useful in some situations.
 
 ## Installation 
-```sh
+```nu
 cargo install hur
 ```
-### Dependencies
-
-On Ubuntu, in addition to Rust, you will need `sudo apt install build-essential libssl-dev pkg-config`.
-
-Or let Cargo tell you what you need.
 
 ## Usage
 
 GET is the default method.
-```sh
+```nu
 hur https://petstore.com/animals -h "header:value"
 ```
 To use another method add `--method`
-```sh
+```nu
 hur https://petstore.com/animals --method POST --body '{"name":"Luffy"}'
 ```
 Using `--verbose` mode will print, in JSON, the request and response objects.

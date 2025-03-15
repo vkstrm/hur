@@ -7,8 +7,8 @@ mod requester;
 
 use cli::output::handle_output;
 use error::Error;
-use requester::connector::{Connector, ProxyConnector, RegularConnector};
 use requester::Requester;
+use requester::connector::{Connector, ProxyConnector, RegularConnector};
 
 pub fn handle(args: Vec<String>) {
     match handle_args(args) {
