@@ -106,7 +106,9 @@ mod tests {
     fn test_get_env() {
         assert_eq!(get_env("TEST_ENV"), None);
         assert_eq!(get_env("test_env"), None);
-        std::env::set_var("TEST_ENV", "ok");
+        unsafe {
+            std::env::set_var("TEST_ENV", "ok");
+        }
         assert_eq!(get_env("TEST_ENV"), Some("ok".to_string()));
         assert_eq!(get_env("test_env"), Some("ok".to_string()));
     }

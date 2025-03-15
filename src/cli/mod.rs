@@ -1,13 +1,12 @@
-use std::io::Read;
 use std::path::PathBuf;
 
-use super::http::{Method, headers::Headers};
+use super::http::Method;
 use super::logs;
 
 use crate::error;
 use crate::error::Error;
 use crate::http::headers::Header;
-use crate::http::request::Request;
+use crate::io::read_file;
 
 use clap::Parser;
 
@@ -40,24 +39,23 @@ struct Cli {
     #[arg(short = 'h', long, help = "Add header as 'key:value'", value_parser = Header::try_from)]
     pub header: Option<Vec<Header>>,
     #[arg(long, help = "Add headers as a JSON string or JSON file")]
-    pub headers: Option<String>,
+    pub headers_json: Option<String>,
     #[arg(short, long, help = "Add request body")]
     pub body: Option<String>,
     #[arg(
         long,
         help = "Path to file to use as request body",
         conflicts_with = "body",
-        conflicts_with = "json"
+        conflicts_with = "body_json"
     )]
     pub body_file: Option<PathBuf>,
     #[arg(
-        short,
         long,
         help = "Request body to send with Content-Type:application/json",
         conflicts_with = "body",
         conflicts_with = "body_file"
     )]
-    pub json: Option<String>,
+    pub body_json: Option<String>,
     #[arg(long, action = clap::ArgAction::Help)]
     help: Option<bool>,
     #[arg(long, help = "Don't use proxy environment variables")]
@@ -66,29 +64,37 @@ struct Cli {
     pub timeout: Option<u64>,
 }
 
-pub fn create_request(args: Vec<String>) -> Result<(Request, bool), Error> {
-    let parser = Cli::parse_from(args);
+pub struct Inputs {
+    pub url: Url,
+    pub method: Method,
+    pub header: Option<Vec<Header>>,
+    pub headers_json: Option<String>,
+    pub body: Option<InputBody>,
+    pub timeout: Option<u64>,
+    pub verbose: bool,
+    pub proxy: bool,
+}
 
-    let parsed_url = parse_url(&parser.url)?;
+pub fn parse_input(args: Vec<String>) -> Result<Inputs, Error> {
+    let parser = Cli::parse_from(args);
     if parser.info {
         enable_logging()?;
     }
 
-    let mut headers = headers(&parser)?;
-    let mut request = match parse_body(&parser, &mut headers)? {
-        Some(body) => Request::with_body(parsed_url, parser.method, headers, &body),
-        None => Request::new(parsed_url, parser.method, headers),
-    }?;
+    let parsed_url = parse_url(&parser.url)?;
+    let body = parse_body(parser.body, parser.body_json, parser.body_file)?;
+    let inputs = Inputs {
+        url: parsed_url,
+        method: parser.method,
+        header: parser.header,
+        headers_json: parser.headers_json,
+        body,
+        timeout: parser.timeout,
+        verbose: parser.verbose,
+        proxy: parser.no_proxy,
+    };
 
-    if parser.no_proxy {
-        request.disable_proxy();
-    }
-
-    if let Some(timeout) = parser.timeout {
-        request.set_timeout(timeout);
-    }
-
-    Ok((request, parser.verbose))
+    Ok(inputs)
 }
 
 fn parse_url(url: &str) -> Result<Url, Error> {
@@ -102,62 +108,46 @@ fn parse_url(url: &str) -> Result<Url, Error> {
     Ok(parsed_url)
 }
 
-fn parse_body(matches: &Cli, headers: &mut Headers) -> Result<Option<String>, Error> {
-    if let Some(body) = &matches.body {
-        return Ok(Some(body.to_string()));
+pub struct InputBody {
+    pub content: String,
+    pub content_type: Option<String>,
+}
+
+fn parse_body(
+    input_body: Option<String>,
+    input_json: Option<String>,
+    input_body_file: Option<PathBuf>,
+) -> Result<Option<InputBody>, Error> {
+    if let Some(body) = input_body {
+        return Ok(Some(InputBody {
+            content: body.to_string(),
+            content_type: None,
+        }));
     }
-    if let Some(body) = &matches.json {
-        match serde_json::from_str::<serde_json::Value>(body) {
+    if let Some(body) = input_json {
+        match serde_json::from_str::<serde_json::Value>(&body) {
             Ok(_) => {
-                headers.add("Content-Type", "application/json");
-                return Ok(Some(body.to_string()));
+                return Ok(Some(InputBody {
+                    content: body.to_string(),
+                    content_type: Some("application/json".to_string()),
+                }));
             }
             Err(why) => error!(&why.to_string()),
         };
     }
-    if let Some(path) = &matches.body_file {
-        let file_str = read_file(path)?;
-        match path.extension() {
-            Some(extension) if extension == "json" => {
-                headers.add("Content-Type", "application/json")
-            }
-            _ => (),
+    if let Some(path) = input_body_file {
+        let file_str = read_file(&path)?;
+        let content_type = match path.extension() {
+            Some(extension) if extension == "json" => Some("application/json".to_string()),
+            _ => None,
         };
-        return Ok(Some(file_str));
+        return Ok(Some(InputBody {
+            content: file_str,
+            content_type,
+        }));
     }
 
     Ok(None)
-}
-
-fn headers(cli: &Cli) -> Result<Headers, Error> {
-    let mut headers = match &cli.header {
-        Some(headers) => Headers::from(headers),
-        None => Headers::new(),
-    };
-
-    if let Some(h) = &cli.headers {
-        let h = json_headers(h)?;
-        headers.append(h)
-    };
-
-    Ok(headers)
-}
-
-fn json_headers(headers_json: &str) -> Result<Headers, Error> {
-    let json_path = std::path::PathBuf::from(headers_json);
-    let json_string = match json_path.extension() {
-        Some(extension) if extension == "json" => read_file(&json_path)?,
-        _ => headers_json.to_string(),
-    };
-    let map: std::collections::HashMap<String, String> = serde_json::from_str(&json_string)?;
-    Ok(Headers::from(map))
-}
-
-fn read_file(path: &PathBuf) -> Result<String, Error> {
-    let mut file = std::fs::File::open(path)?;
-    let mut buf = String::new();
-    file.read_to_string(&mut buf)?;
-    Ok(buf)
 }
 
 fn enable_logging() -> Result<(), log::SetLoggerError> {
@@ -166,51 +156,31 @@ fn enable_logging() -> Result<(), log::SetLoggerError> {
 }
 
 #[test]
-fn test_json_headers() {
-    let temp_dir = std::env::temp_dir();
-    let temp_file = temp_dir.join("headers.json");
-    let input = vec![
-        "hur",
-        "http://localhost",
-        "--headers",
-        temp_file.to_str().unwrap(),
-    ];
-    let cli = Cli::parse_from(input);
-    let mut file = std::fs::File::create(temp_file).unwrap();
-    use std::io::Write;
-    file.write(br#"{"key":"value"}"#).unwrap();
-
-    let headers = headers(&cli).unwrap();
-    assert_eq!(headers.get("Key").unwrap()[0], "value".to_string());
-}
-
-#[test]
-fn test_collect_body() {
+fn test_parse_body() {
     let input = vec!["hur", "http://localhost", "--body", "form:value"];
     let cli = Cli::parse_from(input);
 
-    let mut headers = Headers::new();
-    let body = parse_body(&cli, &mut headers).unwrap();
+    let body = parse_body(cli.body, cli.body_json, cli.body_file).unwrap();
 
     assert!(body.is_some());
-    assert_eq!(body.unwrap(), "form:value");
+    assert_eq!(body.unwrap().content, "form:value");
 }
 
 #[test]
-fn test_collect_json_body() {
+fn test_parse_json_body() {
     let input = vec!["hur", "http://localhost", "--json", r#"{"key":"value"}"#];
     let cli = Cli::parse_from(input);
 
-    let mut headers = Headers::new();
-    let body = parse_body(&cli, &mut headers).unwrap();
+    let body = parse_body(cli.body, cli.body_json, cli.body_file)
+        .unwrap()
+        .unwrap();
 
-    assert!(body.is_some());
-    assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
-    assert!(headers.get("Content-Type").is_some());
+    assert_eq!(body.content, r#"{"key":"value"}"#);
+    assert_eq!(body.content_type.unwrap(), "application/json");
 }
 
 #[test]
-fn test_data_body() {
+fn test_parse_body_file() {
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join("data.json");
     let input = vec![
@@ -224,10 +194,10 @@ fn test_data_body() {
     use std::io::Write;
     file.write(br#"{"key":"value"}"#).unwrap();
 
-    let mut headers = Headers::new();
-    let body = parse_body(&cli, &mut headers).unwrap();
+    let body = parse_body(cli.body, cli.body_json, cli.body_file)
+        .unwrap()
+        .unwrap();
 
-    assert!(body.is_some());
-    assert_eq!(body.unwrap(), r#"{"key":"value"}"#);
-    assert!(headers.get("Content-Type").is_some());
+    assert_eq!(body.content, r#"{"key":"value"}"#);
+    assert_eq!(body.content_type.unwrap(), "application/json");
 }

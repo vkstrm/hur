@@ -66,7 +66,7 @@ mod tests {
         let uri = server.url("/foo");
 
         let url = Url::parse(&uri.to_string()).unwrap();
-        let request = Request::new(url, Method::Get, Headers::new()).unwrap();
+        let request = Request::new(url, Method::Get, Headers::new(), None).unwrap();
 
         let requester = Requester::new(Box::new(RegularConnector::new(10)));
 
