@@ -33,7 +33,12 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(url: Url, method: Method, headers: Headers) -> Result<Self, Error> {
+    pub fn new(
+        url: Url,
+        method: Method,
+        headers: Headers,
+        timeout: Option<u64>,
+    ) -> Result<Self, Error> {
         let scheme = Scheme::try_from(url.scheme())?;
         let url_servers = find_socket_addresses(&url, &scheme)?;
         let (servers, proxy) = match should_proxy(&url, &url_servers, &scheme)? {
@@ -53,7 +58,7 @@ impl Request {
             body: None,
             query: url.query().map_or_else(|| None, |s| Some(String::from(s))),
             url,
-            timeout: 10,
+            timeout: timeout.unwrap_or(10),
         })
     }
 
@@ -62,8 +67,9 @@ impl Request {
         method: Method,
         headers: Headers,
         body: &str,
+        timeout: Option<u64>,
     ) -> Result<Request, Error> {
-        let mut request = Request::new(url, method, headers)?;
+        let mut request = Request::new(url, method, headers, timeout)?;
         request.body = Some(body.to_string());
         request
             .headers
@@ -71,13 +77,13 @@ impl Request {
         Ok(request)
     }
 
-    pub fn disable_proxy(&mut self) {
-        self.proxy = false;
-    }
+    // pub fn disable_proxy(&mut self) {
+    //     self.proxy = false;
+    // }
 
-    pub fn set_timeout(&mut self, timeout: u64) {
-        self.timeout = timeout;
-    }
+    // pub fn set_timeout(&mut self, timeout: u64) {
+    //     self.timeout = timeout;
+    // }
 
     pub fn build(&self) -> String {
         let path = match (self.proxy, &self.scheme) {

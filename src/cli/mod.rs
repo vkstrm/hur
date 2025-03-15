@@ -7,7 +7,6 @@ use super::logs;
 use crate::error;
 use crate::error::Error;
 use crate::http::headers::Header;
-use crate::http::request::Request;
 
 use clap::Parser;
 
@@ -66,29 +65,36 @@ struct Cli {
     pub timeout: Option<u64>,
 }
 
-pub fn create_request(args: Vec<String>) -> Result<(Request, bool), Error> {
-    let parser = Cli::parse_from(args);
+pub struct Inputs {
+    pub url: Url,
+    pub method: Method,
+    pub headers: Headers,
+    pub body: Option<String>,
+    pub timeout: Option<u64>,
+    pub verbose: bool,
+    pub proxy: bool,
+}
 
-    let parsed_url = parse_url(&parser.url)?;
+pub fn parse_input(args: Vec<String>) -> Result<Inputs, Error> {
+    let parser = Cli::parse_from(args);
     if parser.info {
         enable_logging()?;
     }
 
+    let parsed_url = parse_url(&parser.url)?;
     let mut headers = headers(&parser)?;
-    let mut request = match parse_body(&parser, &mut headers)? {
-        Some(body) => Request::with_body(parsed_url, parser.method, headers, &body),
-        None => Request::new(parsed_url, parser.method, headers),
-    }?;
+    let body = parse_body(&parser, &mut headers)?;
+    let inputs = Inputs {
+        url: parsed_url,
+        method: parser.method,
+        headers,
+        body,
+        timeout: parser.timeout,
+        verbose: parser.verbose,
+        proxy: parser.no_proxy,
+    };
 
-    if parser.no_proxy {
-        request.disable_proxy();
-    }
-
-    if let Some(timeout) = parser.timeout {
-        request.set_timeout(timeout);
-    }
-
-    Ok((request, parser.verbose))
+    Ok(inputs)
 }
 
 fn parse_url(url: &str) -> Result<Url, Error> {
