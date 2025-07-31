@@ -24,10 +24,8 @@ fn handle_args(args: Vec<String>) -> Result<(), Error> {
     let inputs = cli::parse_input(args)?;
     let mut headers = parse_headers(inputs.header, inputs.headers_json)?;
     // i would like hur to automatically set all content-types in the future
-    if let Some(input_body) = &inputs.body {
-        if let Some(content_type) = &input_body.content_type {
-            headers.add("Content-Type", content_type);
-        }
+    if let Some(input_body) = &inputs.body && let Some(content_type) = &input_body.content_type {
+        headers.add("Content-Type", content_type);
     }
 
     let request = match inputs.body {
