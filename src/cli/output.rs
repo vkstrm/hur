@@ -10,7 +10,7 @@ pub fn handle_output(
         let json_output = serde_json::json!({"request": request, "response":response});
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else if let Some(body) = &response.body {
-        println!("{}", body)
+        println!("{body}")
     }
     Ok(())
 }

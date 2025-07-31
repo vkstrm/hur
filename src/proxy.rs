@@ -71,7 +71,7 @@ fn proxy_address(proxy: &str) -> Result<Vec<std::net::SocketAddr>, Error> {
         None => error!("no port in proxy url"),
     };
 
-    let proxy = format!("{}:{}", domain, port);
+    let proxy = format!("{domain}:{port}");
     Ok(proxy.to_socket_addrs()?.collect())
 }
 
@@ -83,10 +83,7 @@ fn is_ip_address(ip: &str) -> bool {
 fn get_env(env: &str) -> Option<String> {
     match std::env::var(env.to_lowercase()) {
         Ok(e) => Some(e),
-        Err(_) => match std::env::var(env.to_uppercase()) {
-            Ok(e) => Some(e),
-            Err(_) => None,
-        },
+        Err(_) => std::env::var(env.to_uppercase()).ok(),
     }
 }
 

@@ -104,8 +104,7 @@ fn connect_proxy(
 
 fn connect_message(domain: &str) -> String {
     format!(
-        "CONNECT {0}:443 HTTP/1.1\r\nHost:{0}\r\nConnection:keep-alive\r\n\r\n",
-        domain
+        "CONNECT {domain}:443 HTTP/1.1\r\nHost:{domain}\r\nConnection:keep-alive\r\n\r\n"
     )
 }
 

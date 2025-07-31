@@ -16,7 +16,7 @@ use requester::connector::{Connector, ProxyConnector, RegularConnector};
 pub fn handle(args: Vec<String>) {
     match handle_args(args) {
         Ok(()) => {}
-        Err(error) => eprintln!("{}", error),
+        Err(error) => eprintln!("{error}"),
     }
 }
 

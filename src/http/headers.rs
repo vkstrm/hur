@@ -17,7 +17,7 @@ impl Header {
     pub fn try_from(header: &str) -> Result<Self, Error> {
         let splits: Vec<&str> = header.splitn(2, ':').collect();
         if splits.len() < 2 {
-            error!(&format!("invalid header \"{}\"", header))
+            error!(&format!("invalid header \"{header}\""))
         }
         Ok(Header {
             key: splits[0].trim().to_string(),
