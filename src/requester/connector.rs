@@ -38,7 +38,7 @@ impl Connector for RegularConnector {
         domain: &str,
         request_str: &str,
     ) -> Result<Vec<u8>, Error> {
-        log::info!("Connecting to {}", addr.to_string());
+        log::debug!("Connecting to {}", addr.to_string());
         let stream = connect_timeout(&addr, self.timeout)?;
         tls_request(stream, domain, request_str.as_bytes())
     }
@@ -86,7 +86,7 @@ fn connect_proxy(
     domain: &str,
     proxy_addr: SocketAddr,
 ) -> Result<(), Error> {
-    log::info!(
+    log::debug!(
         "Performing CONNECT request to proxy {}",
         proxy_addr.to_string()
     );
@@ -98,14 +98,12 @@ fn connect_proxy(
     if !connect_successful(&connect_buffer) {
         error!("connect request failed");
     }
-    log::info!("CONNECT request to proxy was successful");
+    log::debug!("CONNECT request to proxy was successful");
     Ok(())
 }
 
 fn connect_message(domain: &str) -> String {
-    format!(
-        "CONNECT {domain}:443 HTTP/1.1\r\nHost:{domain}\r\nConnection:keep-alive\r\n\r\n"
-    )
+    format!("CONNECT {domain}:443 HTTP/1.1\r\nHost:{domain}\r\nConnection:keep-alive\r\n\r\n")
 }
 
 fn connect_successful(buf: &[u8]) -> bool {
@@ -122,7 +120,7 @@ fn tls_request(stream: TcpStream, domain: &str, request: &[u8]) -> Result<Vec<u8
 }
 
 fn http_request(addr: SocketAddr, request_str: &str, timeout: u64) -> Result<Vec<u8>, Error> {
-    log::info!("Connecting to {}", addr.to_string());
+    log::debug!("Connecting to {}", addr.to_string());
     let mut stream = connect_timeout(&addr, timeout)?;
     let mut response_buffer = Vec::new();
 

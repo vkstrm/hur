@@ -1,4 +1,7 @@
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    hur::handle(args);
+    match hur::cli::handle_args(args) {
+        Ok(()) => {}
+        Err(error) => eprintln!("{error}"),
+    }
 }

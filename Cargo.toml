@@ -19,6 +19,7 @@ clap = {version = "4", features = ["cargo", "derive"] }
 serde_json = "1.0.68"
 serde = {version = "1.0.130", features = ["derive"] }
 log = "0.4"
+toml = "0.9.5"
 
 [dev-dependencies]
 httptest = "0.15.4"

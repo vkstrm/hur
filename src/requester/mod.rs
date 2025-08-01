@@ -1,29 +1,83 @@
+use std::io::{self, Write};
+
 use crate::error;
 use crate::error::Error;
 use crate::http::{Scheme, request::Request, response::Response};
+use crate::modes::RedirectMode;
 
 pub mod connector;
 
 use connector::Connector;
+use url::Url;
 
 pub struct Requester {
     connector: Box<dyn Connector>,
+    redirect_mode: RedirectMode,
 }
 
 impl Requester {
-    pub fn new(connector: Box<dyn Connector>) -> Self {
-        Requester { connector }
+    pub fn new(connector: Box<dyn Connector>, redirect_mode: RedirectMode) -> Self {
+        Requester {
+            connector,
+            redirect_mode,
+        }
+    }
+    pub fn do_request(&self, request: Request) -> Result<Response, Error> {
+        let response = self.send_request(&request)?;
+        match self.redirect_mode {
+            RedirectMode::NoFollow => Ok(response),
+            RedirectMode::Follow | RedirectMode::Interactive => match response.status_code {
+                301 | 302 | 307 | 308 => {
+                    let location = if let Some(location) = response.headers.get_first("location") {
+                        location
+                    } else {
+                        error!("status code suggests redirect but Location header is not present")
+                    };
+                    let location_url = match Url::parse(&location) {
+                        Ok(url) => url,
+                        Err(why) => error!(&why.to_string()),
+                    };
+
+                    if let RedirectMode::Interactive = self.redirect_mode {
+                        eprint!("Redirect to {location_url}? [Y, n]: ");
+                        io::stdout().flush()?;
+                        let mut answer = String::new();
+                        match io::stdin().read_line(&mut answer) {
+                            Ok(_) => {
+                                let answer = answer.trim().to_lowercase();
+                                if answer.is_empty() && !answer.starts_with("y") {
+                                    return Ok(response);
+                                }
+                            }
+                            Err(why) => {
+                                error!(&why.to_string());
+                            }
+                        }
+                    }
+
+                    log::debug!("Following redirect to {}", location_url.as_str());
+                    let request = Request::new(
+                        location_url,
+                        request.method,
+                        request.headers,
+                        Some(request.timeout),
+                    )?;
+                    self.send_request(&request)
+                }
+                _ => Ok(response),
+            },
+        }
     }
 
-    pub fn send_request(&self, request: Request) -> Result<Response, Error> {
+    fn send_request(&self, request: &Request) -> Result<Response, Error> {
         let request_str = request.build();
-        for server in request.servers {
+        for server in &request.servers {
             let server_str = server.to_string();
-            log::info!("Trying server {}", server_str);
+            log::debug!("Trying server {}", server_str);
             let result = match request.scheme {
-                Scheme::Http => self.connector.http_request(server, &request_str),
+                Scheme::Http => self.connector.http_request(server.to_owned(), &request_str),
                 Scheme::Https => self.connector.https_request(
-                    server,
+                    server.to_owned(),
                     request.url.domain().unwrap(),
                     &request_str,
                 ),
@@ -68,10 +122,10 @@ mod tests {
         let url = Url::parse(&uri.to_string()).unwrap();
         let request = Request::new(url, Method::Get, Headers::new(), None).unwrap();
 
-        let requester = Requester::new(Box::new(RegularConnector::new(10)));
+        let requester = Requester::new(Box::new(RegularConnector::new(10)), RedirectMode::Follow);
 
         // Act
-        let response = requester.send_request(request).unwrap();
+        let response = requester.do_request(request).unwrap();
 
         // Assert
         assert_eq!(response.status_code, 200);

@@ -5,7 +5,6 @@ use serde::ser::SerializeMap;
 
 use crate::error;
 use crate::error::Error;
-use crate::io::read_file;
 
 #[derive(Clone)]
 pub struct Header {
@@ -24,33 +23,6 @@ impl Header {
             value: splits[1].trim().to_string(),
         })
     }
-}
-
-pub fn parse_headers(
-    input_header: Option<Vec<Header>>,
-    input_headers: Option<String>,
-) -> Result<Headers, Error> {
-    let mut headers = match input_header {
-        Some(headers) => Headers::from(headers),
-        None => Headers::new(),
-    };
-
-    if let Some(h) = input_headers {
-        let h = json_headers(&h)?;
-        headers.append(h)
-    };
-
-    Ok(headers)
-}
-
-fn json_headers(headers_json: &str) -> Result<Headers, Error> {
-    let json_path = std::path::PathBuf::from(headers_json);
-    let json_string = match json_path.extension() {
-        Some(extension) if extension == "json" => read_file(&json_path)?,
-        _ => headers_json.to_string(),
-    };
-    let map: std::collections::HashMap<String, String> = serde_json::from_str(&json_string)?;
-    Ok(Headers::from(map))
 }
 
 #[test]
@@ -138,6 +110,12 @@ impl Headers {
         self.internal_headers
             .get(header.to_lowercase().as_str())
             .filter(|&vec| !vec.is_empty())
+    }
+
+    pub fn get_first(&self, header: &str) -> Option<String> {
+        let headers = self.get(header);
+        headers?;
+        headers.unwrap().first().cloned()
     }
 
     pub fn iter(&self) -> HeaderIterator {

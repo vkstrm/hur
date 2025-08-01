@@ -15,11 +15,11 @@ cargo install hur
 
 GET is the default method.
 ```nu
-hur https://petstore.com/animals -h "header:value"
+hur req https://petstore.com/animals -h "header:value"
 ```
 To use another method add `--method`
 ```nu
-hur https://petstore.com/animals --method POST --body '{"name":"Luffy"}'
+hur req https://petstore.com/animals --method POST --body '{"name":"Luffy"}'
 ```
 Using `--verbose` mode will print, in JSON, the request and response objects.
 ```json
@@ -37,7 +37,13 @@ Using `--verbose` mode will print, in JSON, the request and response objects.
     }
 }
 ```
-Use `--help` for more information.
+Use `help` for more information.
+
+## Config
+
+Hur has a configuration file. Currently it only support setting redirect mode.
+
+It can be created by running `hur config create`.
 
 ## Proxy
 

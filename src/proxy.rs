@@ -50,7 +50,7 @@ fn proxy(scheme: &http::Scheme) -> Result<Option<Vec<std::net::SocketAddr>>, Err
         http::Scheme::Https => "HTTPS_PROXY".to_string(),
     };
     if let Some(proxy) = get_env(&proxy_key) {
-        log::info!("Found proxy address {}", proxy);
+        log::debug!("Found proxy address {}", proxy);
         return Ok(Some(proxy_address(&proxy)?));
     }
 
